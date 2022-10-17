@@ -1,5 +1,5 @@
 # Status
-[![Build](https://github.com/Project-Faster/qpep/actions/workflows/go.yml/badge.svg?branch=issue-10)](https://github.com/Project-Faster/qpep/actions/workflows/go.yml)
+[![Build](https://github.com/Project-Faster/qpep/actions/workflows/integration.yml/badge.svg?branch=main)](https://github.com/Project-Faster/qpep/actions/workflows/integration.yml)
 
 # Background context
 See https://docs.projectfaster.org/use-cases/vpn-over-satellite/vpn-client-software/optimizing-client-software. This repository includes the Windows port of qpep.
