@@ -4,21 +4,44 @@ on:
   workflow_dispatch:
     inputs:
       test_release:
-            description: 'Dummy release'
+            description: 'Draft Release'
             required: true
-            default: 'true'
+            type: boolean
+            default: true
+      x86_version:
+            description: 'Create x86 version'
+            type: boolean
+            default: false
       version_tag:
             description: 'Version tag'
             type: 'string'
             required: true
             default: '0.0.1'
-      x86_version:
-            description: '32bits version'
-            required: true
-            default: 'false'
 
 jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check tag
+        uses: mukunku/tag-exists-action@v1.0.0
+        id: checkTag
+        with: 
+          tag: 'v${{ github.event.inputs.version_tag }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - if: ${{ steps.checkTag.outputs.exists == 'true' }}
+        name: Fail build
+        run: exit 1
+    
   build-linux:
+    needs: check-release
     runs-on: ubuntu-latest
     defaults:
       run: 
@@ -26,6 +49,7 @@ jobs:
         
     steps:
     - uses: actions/checkout@v3
+
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
@@ -38,8 +62,9 @@ jobs:
       run: |
         set GOARCH=amd64
         set GOOS=linux
-        set CGO_ENABLED=1
+        set CGO_ENABLED=0
         go test -v ./...
+      continue-on-error: true
       
     - name: Build x64
       run: |
@@ -51,10 +76,11 @@ jobs:
       
     - uses: actions/upload-artifact@v3
       with:
-        name: qpep-linux-${{ github.run_id }}
+        name: qpep_linux_b${{ github.run_id }}
         path: build/qpep
 
   build-windows:
+    needs: check-release
     runs-on: windows-latest
     defaults:
       run: 
@@ -70,9 +96,10 @@ jobs:
     - name: Test
       run: |
         set GOARCH=amd64
-        set GOOS=linux
+        set GOOS=windows
         set CGO_ENABLED=1
         go test -v ./...
+      continue-on-error: true
       
     - uses: actions/checkout@v2
     - name: Install Wix
@@ -112,13 +139,13 @@ jobs:
            go build -ldflags -H=windowsgui -o ..\build\x86\qpep-tray.exe
            popd
            
-    - if: ${{ github.event.inputs.x86_version == 'true' }}
+    - if: ${{ github.event.inputs.x86_version == true }}
       name: Set up MinGW
       uses: egor-tensin/setup-mingw@v2
       with:
         platform: x86
         
-    - if: ${{ github.event.inputs.x86_version == 'true' }}
+    - if: ${{ github.event.inputs.x86_version == true }}
       name: Build QPep x86
       run: |
            set GOARCH=386
@@ -126,7 +153,7 @@ jobs:
            set CGO_ENABLED=1
            go build -o build\x64\qpep.exe
            
-    - if: ${{ github.event.inputs.x86_version == 'true' }}
+    - if: ${{ github.event.inputs.x86_version == true }}
       name: Build QPep Tray x86
       run: |
            pushd qpep-tray
@@ -143,31 +170,71 @@ jobs:
    
     - uses: actions/upload-artifact@v3
       with:
-        name: qpep-windows-${{ github.run_id }}
-        path: build\installer.msi
+        name: qpep_windows_b${{ github.run_id }}
+        path: build/installer.msi
 
   create-release-tag:
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     defaults:
       run: 
         shell: bash
         
     steps:
-        - name: "Create release"
-          uses: "actions/github-script@v5"
-          with:
-            github-token: "${{ secrets.GITHUB_TOKEN }}"
-            script: |
-              try {
-                await github.rest.repos.createRelease({
-                  draft: ${{ github.event.inputs.test_release == 'true' }},
-                  generate_release_notes: true,
-                  name: "v${{ github.event.inputs.version_tag }}",
-                  owner: context.repo.owner,
-                  prerelease: false,
-                  repo: context.repo.repo,
-                  tag_name: "v${{ github.event.inputs.version_tag }}",
-                });
-              } catch (error) {
-                core.setFailed(error.message);
-              }
+      - name: Changelog
+        uses: scottbrenner/generate-changelog-action@master
+        id: Changelog
+        env:
+          REPO: ${{ github.repository }}
+    
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.event.inputs.version_tag }}
+          release_name: Release v${{ github.event.inputs.version_tag }}
+          body: |
+            ${{ steps.Changelog.outputs.changelog }}
+          draft: ${{ github.event.inputs.test_release == true }}
+          prerelease: false
+          
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: qpep_windows_b${{ github.run_id }}
+      
+      - name: Download Linux Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: qpep_linux_b${{ github.run_id }}
+      
+      - name: Prepare archives
+        run: |
+           cd ${{ github.workspace }}
+           7z a -tzip qpep_windows_b${{ github.run_id }}.zip ${{ github.workspace }}/installer.msi
+           7z a -tzip qpep_linux_b${{ github.run_id }}.zip ${{ github.workspace }}/qpep
+        
+      - name: Attach Windows Release Asset
+        id: upload-release-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: qpep_windows_b${{ github.run_id }}.zip
+          asset_name: qpep_windows_v${{ github.event.inputs.version_tag }}_b${{ github.run_id }}.zip
+          asset_content_type: application/zip
+          
+      - name: Attach Linux Release Asset
+        id: upload-linux-asset 
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: qpep_linux_b${{ github.run_id }}.zip
+          asset_name: qpep_linux_v${{ github.event.inputs.version_tag }}_b${{ github.run_id }}.zip
+          asset_content_type: application/zip
+          
