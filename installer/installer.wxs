@@ -22,8 +22,8 @@
         <Directory Id="TARGETDIR" Name="SourceDir">
             <Directory Id="ProgramFilesFolder">
                 <Directory Id="APPLICATIONROOTDIRECTORY" Name="QPep" >
-                    <Directory Id="INSTALLDIRX86" Name="x86" />
-                    <Directory Id="INSTALLDIRX64" Name="x64" />
+                    <Directory Id="INSTALLDIRX86" Name="32bits" />
+                    <Directory Id="INSTALLDIRX64" Name="64bits" />
                 </Directory>
             </Directory>
 

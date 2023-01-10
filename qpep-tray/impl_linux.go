@@ -28,16 +28,18 @@ func getClientCommand() *exec.Cmd {
 		"--client",
 		fmt.Sprintf("%v", verboseFlag),
 		"--acks", fmt.Sprintf("%d", qpepConfig.Acks),
-		"--ackDelay", fmt.Sprintf("%d", qpepConfig.AckDelay),
+		"--ackdelay", fmt.Sprintf("%d", qpepConfig.AckDelay),
 		"--congestion", fmt.Sprintf("%d", qpepConfig.Congestion),
 		"--decimate", fmt.Sprintf("%d", qpepConfig.Decimate),
-		"--minBeforeDecimation", fmt.Sprintf("%d", qpepConfig.DelayDecimate),
+		"--decimatetime", fmt.Sprintf("%d", qpepConfig.DelayDecimate),
+		"--maxretries", fmt.Sprintf("%d", qpepConfig.MaxConnectionsRetries),
+		"--preferproxy", fmt.Sprintf("%v", qpepConfig.PreferProxy),
 		"--gateway", fmt.Sprintf("%s", qpepConfig.GatewayHost),
 		"--port", fmt.Sprintf("%d", qpepConfig.GatewayPort),
 		"--listenaddress", fmt.Sprintf("%s", qpepConfig.ListenHost),
 		"--listenport", fmt.Sprintf("%d", qpepConfig.ListenPort),
 		"--multistream", fmt.Sprintf("%v", qpepConfig.MultiStream),
-		"--varAckDelay", fmt.Sprintf("%d", qpepConfig.VarAckDelay),
+		"--varackdelay", fmt.Sprintf("%d", qpepConfig.VarAckDelay),
 		"--threads", fmt.Sprintf("%d", qpepConfig.WinDivertThreads))
 
 	if cmd == nil {
@@ -62,17 +64,18 @@ func getServerCommand() *exec.Cmd {
 	cmd := exec.Command(exeFile,
 		fmt.Sprintf("%v", verboseFlag),
 		"--acks", fmt.Sprintf("%d", qpepConfig.Acks),
-		"--ackDelay", fmt.Sprintf("%d", qpepConfig.AckDelay),
+		"--ackdelay", fmt.Sprintf("%d", qpepConfig.AckDelay),
 		"--congestion", fmt.Sprintf("%d", qpepConfig.Congestion),
 		"--decimate", fmt.Sprintf("%d", qpepConfig.Decimate),
-		"--minBeforeDecimation", fmt.Sprintf("%d", qpepConfig.DelayDecimate),
+		"--decimatetime", fmt.Sprintf("%d", qpepConfig.DelayDecimate),
+		"--maxretries", fmt.Sprintf("%d", qpepConfig.MaxConnectionsRetries),
 		"--gateway", fmt.Sprintf("%s", qpepConfig.GatewayHost),
 		"--port", fmt.Sprintf("%d", qpepConfig.GatewayPort),
 		"--apiport", fmt.Sprintf("%d", qpepConfig.GatewayAPIPort),
 		"--listenaddress", fmt.Sprintf("%s", qpepConfig.ListenHost),
 		"--listenport", fmt.Sprintf("%d", qpepConfig.ListenPort),
 		"--multistream", fmt.Sprintf("%v", qpepConfig.MultiStream),
-		"--varAckDelay", fmt.Sprintf("%d", qpepConfig.VarAckDelay),
+		"--varackdelay", fmt.Sprintf("%d", qpepConfig.VarAckDelay),
 		"--threads", fmt.Sprintf("%d", qpepConfig.WinDivertThreads))
 
 	if cmd == nil {

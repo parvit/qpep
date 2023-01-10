@@ -24,9 +24,19 @@ func main() {
 			log.Printf("PANIC: %v", err)
 			debug.PrintStack()
 		}
+		shared.SetSystemProxy(false) // be sure to clear proxy settings on exit
 	}()
 
-	f, err := os.OpenFile("qpep.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	log.SetFlags(log.Ltime | log.Lmicroseconds)
+
+	shared.ParseFlags(os.Args) // don't skip first parameter
+
+	logName := "qpep-server.log"
+	if shared.QuicConfiguration.ClientFlag {
+		logName = "qpep-client.log"
+	}
+
+	f, err := os.OpenFile(logName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -34,11 +44,9 @@ func main() {
 	wrt := io.MultiWriter(os.Stdout, f)
 	log.SetOutput(wrt)
 
-	log.SetFlags(log.Ltime | log.Lmicroseconds)
-
-	shared.ParseFlags(os.Args) // don't skip first parameter
-
 	execContext, cancelExecutionFunc := context.WithCancel(context.Background())
+
+	shared.SetSystemProxy(false) // clear previous data
 
 	go api.RunServer(execContext, cancelExecutionFunc, true) // api server for local webgui
 
@@ -79,19 +87,6 @@ func runAsClient(execContext context.Context, cancel context.CancelFunc) {
 	log.Println("Running Client")
 
 	windivert.EnableDiverterLogging(shared.QuicConfiguration.Verbose)
-
-	gatewayHost := shared.QuicConfiguration.GatewayIP
-	gatewayPort := shared.QuicConfiguration.GatewayPort
-	listenHost := shared.QuicConfiguration.ListenIP
-	listenPort := shared.QuicConfiguration.ListenPort
-	threads := shared.QuicConfiguration.WinDivertThreads
-
-	if code := windivert.InitializeWinDivertEngine(gatewayHost, listenHost, gatewayPort, listenPort, threads); code != windivert.DIVERT_OK {
-		windivert.CloseWinDivertEngine()
-
-		log.Printf("ERROR: Could not initialize WinDivert engine, code %d\n", code)
-		os.Exit(1)
-	}
 
 	go client.RunClient(execContext, cancel)
 }

@@ -1,4 +1,4 @@
-//go:build linux,cgo
+//go:build linux && cgo
 // +build linux,cgo
 
 package windivert
@@ -13,7 +13,7 @@ const (
 	DIVERT_ERROR_FAILED        = 3
 )
 
-func InitializeWinDivertEngine(gatewayAddr, listenAddr string, gatewayPort, listenPort, numThreads int) int {
+func InitializeWinDivertEngine(gatewayAddr, listenAddr string, gatewayPort, listenPort, numThreads int, gatewayInterfaces int64) int {
 	return DIVERT_OK
 }
 
