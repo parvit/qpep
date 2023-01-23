@@ -12,7 +12,6 @@ import (
 	//"github.com/lucas-clemente/quic-go/qlog"
 	"io"
 	"io/ioutil"
-	"log"
 	"math/big"
 	"net"
 	"runtime/debug"
@@ -21,6 +20,8 @@ import (
 	"time"
 
 	"github.com/parvit/qpep/api"
+	"github.com/parvit/qpep/client"
+	. "github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
 
 	"github.com/lucas-clemente/quic-go"
@@ -37,7 +38,7 @@ var (
 		APIPort:    444,
 	}
 	quicListener            quic.Listener
-	quicSession             quic.Session
+	quicSession             quic.Connection
 	QuicServerConfiguration = quic.Config{
 		MaxIncomingStreams:      40000,
 		DisablePathMTUDiscovery: true,
@@ -62,7 +63,7 @@ type ServerConfig struct {
 func RunServer(ctx context.Context, cancel context.CancelFunc) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v\n", err)
+			Info("PANIC: %v\n", err)
 			debug.PrintStack()
 		}
 		if quicListener != nil {
@@ -75,11 +76,11 @@ func RunServer(ctx context.Context, cancel context.CancelFunc) {
 	validateConfiguration()
 
 	listenAddr := ServerConfiguration.ListenHost + ":" + strconv.Itoa(ServerConfiguration.ListenPort)
-	log.Printf("Opening QPEP Server on: %s\n", listenAddr)
+	Info("Opening QPEP Server on: %s\n", listenAddr)
 	var err error
-	quicListener, err = quic.ListenAddr(listenAddr, generateTLSConfig(), &QuicServerConfiguration)
+	quicListener, err = quic.ListenAddr(listenAddr, generateTLSConfig(), &client.QuicClientConfiguration)
 	if err != nil {
-		log.Printf("Encountered error while binding QUIC listener: %s\n", err)
+		Info("Encountered error while binding QUIC listener: %s\n", err)
 		return
 	}
 
@@ -102,7 +103,7 @@ func RunServer(ctx context.Context, cancel context.CancelFunc) {
 func ListenQuicSession() {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v\n", err)
+			Info("PANIC: %v\n", err)
 			debug.PrintStack()
 		}
 	}()
@@ -110,17 +111,17 @@ func ListenQuicSession() {
 		var err error
 		quicSession, err = quicListener.Accept(context.Background())
 		if err != nil {
-			log.Printf("Unrecoverable error while accepting QUIC session: %s\n", err)
+			Info("Unrecoverable error while accepting QUIC session: %s\n", err)
 			return
 		}
 		go ListenQuicConn(quicSession)
 	}
 }
 
-func ListenQuicConn(quicSession quic.Session) {
+func ListenQuicConn(quicSession quic.Connection) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v\n", err)
+			Info("PANIC: %v\n", err)
 			debug.PrintStack()
 		}
 	}()
@@ -128,11 +129,11 @@ func ListenQuicConn(quicSession quic.Session) {
 		stream, err := quicSession.AcceptStream(context.Background())
 		if err != nil {
 			if err.Error() != "NO_ERROR: No recent network activity" {
-				log.Printf("Unrecoverable error while accepting QUIC stream: %s\n", err)
+				Info("Unrecoverable error while accepting QUIC stream: %s\n", err)
 			}
 			return
 		}
-		log.Printf("Opening QUIC StreamID: %d\n", stream.StreamID())
+		Info("Opening QUIC StreamID: %d\n", stream.StreamID())
 
 		go handleQuicStream(stream)
 	}
@@ -141,14 +142,14 @@ func ListenQuicConn(quicSession quic.Session) {
 func handleQuicStream(stream quic.Stream) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v\n", err)
+			Info("PANIC: %v\n", err)
 			debug.PrintStack()
 		}
 	}()
 
 	qpepHeader, err := shared.GetQpepHeader(stream)
 	if err != nil {
-		log.Printf("Unable to find QPEP header: %s\n", err)
+		Info("Unable to find QPEP header: %s\n", err)
 		return
 	}
 
@@ -159,7 +160,7 @@ func handleQuicStream(stream quic.Stream) {
 		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, ServerConfiguration.APIPort)
 	}
 
-	log.Printf(">> Opening TCP Connection to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
+	Info(">> Opening TCP Connection to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
 	dial := &net.Dialer{
 		LocalAddr: &net.TCPAddr{IP: net.ParseIP(ServerConfiguration.ListenHost)},
 		Timeout:   1 * time.Second,
@@ -168,10 +169,10 @@ func handleQuicStream(stream quic.Stream) {
 	}
 	tcpConn, err := dial.Dial("tcp", destAddress)
 	if err != nil {
-		log.Printf("Unable to open TCP connection from QPEP stream: %s\n", err)
+		Info("Unable to open TCP connection from QPEP stream: %s\n", err)
 		return
 	}
-	log.Printf(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
+	Info(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
 
 	trackedAddress := qpepHeader.SourceAddr.IP.String()
 	proxyAddress := tcpConn.(*net.TCPConn).LocalAddr().String()
@@ -199,7 +200,7 @@ func handleQuicStream(stream quic.Stream) {
 
 		err1 := dst.SetLinger(1)
 		if err1 != nil {
-			log.Printf("error on setLinger: %s\n", err1)
+			Info("error on setLinger: %s\n", err1)
 		}
 
 		var buffSize = INITIAL_BUFF_SIZE
@@ -241,7 +242,7 @@ func handleQuicStream(stream quic.Stream) {
 
 		err1 := src.SetLinger(1)
 		if err1 != nil {
-			log.Printf("error on setLinger: %s\n", err1)
+			Info("error on setLinger: %s\n", err1)
 		}
 
 		var buffSize = INITIAL_BUFF_SIZE
@@ -262,7 +263,7 @@ func handleQuicStream(stream quic.Stream) {
 				if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 					continue
 				}
-				//log.Printf("Error on Copy %s\n", err)
+				//Info("Error on Copy %s\n", err)
 				break
 			}
 
@@ -272,7 +273,7 @@ func handleQuicStream(stream quic.Stream) {
 				buffSize = INITIAL_BUFF_SIZE
 			}
 		}
-		//log.Printf("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
+		//Info("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
 	}
 
 	go streamQUICtoTCP(tcpConn.(*net.TCPConn), stream)
@@ -285,7 +286,7 @@ func handleQuicStream(stream quic.Stream) {
 	stream.CancelRead(0)
 	stream.CancelWrite(0)
 	stream.Close()
-	log.Printf(">> Closing TCP Conn %s->%s\n", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
+	Info(">> Closing TCP Conn %s->%s\n", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
 }
 
 func generateTLSConfig() *tls.Config {
@@ -317,7 +318,7 @@ func generateTLSConfig() *tls.Config {
 func performanceWatcher(ctx context.Context) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v\n", err)
+			Info("PANIC: %v\n", err)
 			debug.PrintStack()
 		}
 	}()
@@ -350,9 +351,9 @@ func performanceWatcher(ctx context.Context) {
 }
 
 func validateConfiguration() {
-	ServerConfiguration.ListenHost, _ = shared.GetDefaultLanListeningAddress(shared.QuicConfiguration.ListenIP, "")
-	ServerConfiguration.ListenPort = shared.QuicConfiguration.ListenPort
-	ServerConfiguration.APIPort = shared.QuicConfiguration.GatewayAPIPort
+	ServerConfiguration.ListenHost, _ = shared.GetDefaultLanListeningAddress(shared.QPepConfig.ListenHost, "")
+	ServerConfiguration.ListenPort = shared.QPepConfig.ListenPort
+	ServerConfiguration.APIPort = shared.QPepConfig.GatewayAPIPort
 
 	shared.AssertParamIP("listen host", ServerConfiguration.ListenHost)
 	shared.AssertParamPort("listen port", ServerConfiguration.ListenPort)
@@ -361,9 +362,5 @@ func validateConfiguration() {
 
 	shared.AssertParamPortsDifferent("ports", ServerConfiguration.ListenPort, ServerConfiguration.APIPort)
 
-	// override the configured listening address with the discovered one
-	// if not set explicitly
-	shared.QuicConfiguration.ListenIP = ServerConfiguration.ListenHost
-	// validation ok
-	log.Printf("Server configuration validation OK\n")
+	Info("Server configuration validation OK\n")
 }

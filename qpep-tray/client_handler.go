@@ -1,16 +1,16 @@
 package main
 
 import (
+	"errors"
 	"log"
-	"os/exec"
 
 	"github.com/parvit/qpep/shared"
 )
 
-var clientCmd *exec.Cmd
+var clientActive bool = false
 
 func startClient() error {
-	if clientCmd != nil {
+	if clientActive {
 		log.Println("ERROR: Cannot start an already running client, first stop it")
 		return shared.ErrFailed
 	}
@@ -18,51 +18,73 @@ func startClient() error {
 	addressList, _ := shared.GetLanListeningAddresses()
 	for idx, addr := range addressCheckBoxList {
 		if addr.Checked() {
-			qpepConfig.ListenHost = addressList[idx]
-			log.Printf("Forced Listening address to %v\n", qpepConfig.ListenHost)
+			shared.QPepConfig.ListenHost = addressList[idx]
+			log.Printf("Forced Listening address to %v\n", shared.QPepConfig.ListenHost)
 			break
 		}
 	}
 
-	clientCmd = getClientCommand()
+	shared.WriteConfigurationOverrideFile(map[string]string{
+		"listenaddress": shared.QPepConfig.ListenHost,
+	})
 
-	if err := clientCmd.Start(); err != nil {
+	if err := startClientProcess(); err != nil {
 		ErrorMsg("Could not start client program: %v", err)
-		clientCmd = nil
+		clientActive = false
 		return shared.ErrCommandNotStarted
 	}
+	clientActive = true
 	InfoMsg("Client started")
 
 	return nil
 }
 
 func stopClient() error {
-	if clientCmd == nil {
-		log.Println("ERROR: Cannot stop an already stopped client, first start it")
+	if !clientActive {
+		ErrorMsg("ERROR: Cannot stop an already stopped client, first start it")
 		return nil
 	}
 
 	if err := stopClientProcess(); err != nil {
-		log.Printf("Could not stop process gracefully (%v), will try to force-terminate it\n", err)
-
-		if err := clientCmd.Process.Kill(); err != nil {
-			ErrorMsg("Could not force-terminate process")
-			return err
-		}
+		ErrorMsg("Could not stop process gracefully (%v)n", err)
+		return err
 	}
 
-	clientCmd.Wait()
-	clientCmd = nil
+	clientActive = false
 	shared.SetSystemProxy(false)
 	InfoMsg("Client stopped")
 	return nil
 }
 
 func reloadClientIfRunning() {
-	if clientCmd == nil {
+	if !clientActive {
 		return
 	}
 
 	stopClient()
 	startClient()
+}
+
+func startClientProcess() error {
+	cmd := getServiceCommand(true, true)
+	if cmd == nil {
+		return errors.New("Failed command")
+	}
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
+}
+
+func stopClientProcess() error {
+	cmd := getServiceCommand(false, true)
+	if cmd == nil {
+		return errors.New("Failed command")
+	}
+	err := cmd.Start()
+	if err != nil {
+		return err
+	}
+	return cmd.Wait()
 }

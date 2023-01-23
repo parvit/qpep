@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/parvit/qpep/shared"
 	"log"
 	"runtime/debug"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/getlantern/systray"
 	"github.com/parvit/qpep/api"
 	"github.com/parvit/qpep/qpep-tray/icons"
+	"github.com/parvit/qpep/shared"
 
 	. "github.com/sqweek/dialog"
 )
@@ -62,8 +62,8 @@ func onReady() {
 		addressCheckBoxList = append(addressCheckBoxList, box)
 	}
 	systray.AddSeparator()
-	mClient := systray.AddMenuItemCheckbox("Client Disabled", "Launch/Stop QPep Client", false)
-	mServer := systray.AddMenuItemCheckbox("Server Disabled", "Launch/Stop QPep Server", false)
+	mClient := systray.AddMenuItemCheckbox("Activate Client", "Launch/Stop QPep Client", false)
+	mServer := systray.AddMenuItemCheckbox("Activate Server", "Launch/Stop QPep Server", false)
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Stop all and quit the whole app")
 
@@ -90,8 +90,8 @@ func onReady() {
 		mServerActive := false
 
 		// check clicks on address checkboxes
-		for _, box := range addressCheckBoxList {
-			go func(self *systray.MenuItem) {
+		for idx, box := range addressCheckBoxList {
+			go func(self *systray.MenuItem, index int) {
 				for {
 					select {
 					case <-self.ClickedCh:
@@ -102,9 +102,10 @@ func onReady() {
 							}
 							checkbox.Uncheck()
 						}
+						InfoMsg("Listening address will be forced to %s", addressList[index])
 					}
 				}
-			}(box)
+			}(box, idx)
 		}
 
 		for {
@@ -118,7 +119,7 @@ func onReady() {
 				continue
 
 			case <-mConfigRefresh.ClickedCh:
-				readConfiguration()
+				shared.ReadConfiguration(true)
 				continue
 
 			case <-mClient.ClickedCh:
@@ -128,12 +129,12 @@ func onReady() {
 					}
 					if startClient() == nil {
 						mClientActive = true
-						mClient.SetTitle("Client Enabled")
+						mClient.SetTitle("Stop Client")
 						mClient.Enable()
 						mClient.Check()
 
 						mServerActive = false
-						mServer.SetTitle("Server Disabled")
+						mServer.SetTitle("Activate Server")
 						mServer.Uncheck()
 						mServer.Disable()
 						stopServer()
@@ -145,12 +146,12 @@ func onReady() {
 					}
 					if stopClient() == nil {
 						mClientActive = false
-						mClient.SetTitle("Client Disabled")
+						mClient.SetTitle("Activate Client")
 						mClient.Enable()
 						mClient.Uncheck()
 
 						mServerActive = false
-						mServer.SetTitle("Server Disabled")
+						mServer.SetTitle("Activate Server")
 						mServer.Uncheck()
 						mServer.Enable()
 						stopServer()
@@ -163,13 +164,13 @@ func onReady() {
 						break
 					}
 					mServerActive = true
-					mServer.SetTitle("Server Enabled")
+					mServer.SetTitle("Stop Server")
 					mServer.Enable()
 					mServer.Check()
 					startServer()
 
 					mClientActive = false
-					mClient.SetTitle("Client Disabled")
+					mClient.SetTitle("Activate Client")
 					mClient.Uncheck()
 					mClient.Disable()
 					stopClient()
@@ -178,13 +179,13 @@ func onReady() {
 						break
 					}
 					mServerActive = false
-					mServer.SetTitle("Server Disabled")
+					mServer.SetTitle("Activate Server")
 					mServer.Enable()
 					mServer.Uncheck()
 					stopServer()
 
 					mClientActive = false
-					mClient.SetTitle("Client Disabled")
+					mClient.SetTitle("Activate Client")
 					mClient.Uncheck()
 					mClient.Enable()
 					stopClient()
@@ -262,7 +263,7 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				break CHECKLOOP
 
 			case <-time.After(1 * time.Second):
-				if clientCmd == nil && serverCmd == nil {
+				if !clientActive && !serverActive {
 					state = stateDisconnected
 					pubAddress = ""
 					systray.SetTemplateIcon(icons.MainIconData, icons.MainIconData)
@@ -279,10 +280,14 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				// Client -> Server: url must contain "/server", so flag true
 				// Server -> Server: url must contain "/server", so flag true
 				// All else false so url contains "/client"
-				var clientToServer = (serverCmd == nil && clientCmd != nil) || (serverCmd != nil && clientCmd == nil)
+				var clientToServer = (!serverActive && clientActive) || (serverActive && !clientActive)
+
+				listenHost := shared.QPepConfig.ListenHost
+				gatewayHost := shared.QPepConfig.GatewayHost
+				gatewayAPIPort := shared.QPepConfig.GatewayAPIPort
 
 				if state != stateConnected {
-					var resp = api.RequestEcho(qpepConfig.ListenHost, qpepConfig.GatewayHost, qpepConfig.GatewayAPIPort, clientToServer)
+					var resp = api.RequestEcho(listenHost, gatewayHost, gatewayAPIPort, clientToServer)
 					if resp == nil {
 						systray.SetTemplateIcon(animIcons[flip], animIcons[flip])
 						flip = (flip + 1) % 2
@@ -290,7 +295,7 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 						// check in tray-icon for activated proxy
 						shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
 						if shared.UsingProxy {
-							qpepConfig.ListenHost = shared.ProxyAddress.Hostname()
+							shared.QPepConfig.ListenHost = shared.ProxyAddress.Hostname()
 						}
 						log.Printf("Proxy: %v %v\n", shared.UsingProxy, shared.ProxyAddress)
 						log.Printf("Server Echo: FAILED\n")
@@ -302,7 +307,7 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				}
 
 				if len(pubAddress) > 0 {
-					var status = api.RequestStatus(qpepConfig.ListenHost, qpepConfig.GatewayHost, qpepConfig.GatewayAPIPort, pubAddress, clientToServer)
+					var status = api.RequestStatus(listenHost, gatewayHost, gatewayAPIPort, pubAddress, clientToServer)
 					if status == nil {
 						log.Printf("Server Status: no / invalid response\n")
 					} else if status.ConnectionCounter < 0 {

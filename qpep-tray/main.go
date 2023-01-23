@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/getlantern/systray"
-	"github.com/parvit/qpep/shared"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/getlantern/systray"
+	"github.com/parvit/qpep/shared"
 )
 
 var (
@@ -38,7 +39,7 @@ func main() {
 
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
-	if err := readConfiguration(); err != nil {
+	if err := shared.ReadConfiguration(true); err != nil {
 		ErrorMsg("Could not load configuration file, please edit: %v", err)
 	}
 

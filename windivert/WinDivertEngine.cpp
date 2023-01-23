@@ -147,10 +147,10 @@ int CloseWinDivertEngine()
 
 /**
  * @brief Adds a network interface index to the list of allowed interface for the divert engine
- * 
+ *
  * Maximum number of interfaces is controlled by the define MAX_INTERFACES.
  * Will not add twice the same index to the list
- * 
+ *
  */
 void SetGatewayInterfaceIndexToDivert( int _interfaceIndex )
 {
@@ -165,7 +165,7 @@ void SetGatewayInterfaceIndexToDivert( int _interfaceIndex )
 
 /**
  * @brief Check if interface can be diverted
- * 
+ *
  */
 BOOL checkAllowedInterfaceToDivert( UINT32 idx ) {
     return idx == allowedGatewayInterface;
@@ -230,8 +230,8 @@ DWORD WINAPI dispatchDivertedOutboundPackets(LPVOID lpParameter)
         next = NULL;
         nextLen = 0;
 
-        // very important: if any operation (even access) is done on the tcp header 
-        // than reinjection fails without explanation so the decision for reinjection 
+        // very important: if any operation (even access) is done on the tcp header
+        // than reinjection fails without explanation so the decision for reinjection
         // must be done right away
         if( checkAllowedInterfaceToDivert(recv_addr.Network.IfIdx) != TRUE ) {
             memcpy(&send_addr, &recv_addr, sizeof(WINDIVERT_ADDRESS));
@@ -250,10 +250,10 @@ DWORD WINAPI dispatchDivertedOutboundPackets(LPVOID lpParameter)
                 continue;
             }
 
-            logNativeMessageToGo(th->threadID,  "Reinjected packet: [%d:%d] %s", 
+            logNativeMessageToGo(th->threadID,  "Reinjected packet: [%d:%d] %s",
                 recv_addr.Network.IfIdx, recv_addr.Network.SubIfIdx,
                 (recv_addr.Outbound? "---->": "<----") );
-                
+
             continue;
         }
 
@@ -298,14 +298,14 @@ DWORD WINAPI dispatchDivertedOutboundPackets(LPVOID lpParameter)
 
         UINT localSrcPort = ntohs(tcp_header->SrcPort);
         UINT localDstPort = ntohs(tcp_header->DstPort);
-        
+
         if( !recv_addr.Outbound ) {
             logNativeMessageToGo(th->threadID, "Dropped...");
             continue;
         }
 
         // announce and handle the packet
-        logNativeMessageToGo(th->threadID,  "Received packet: [%d:%d] %s:%d %s %s:%d (%d) [S:%d A:%d F:%d P:%d R:%d]", 
+        logNativeMessageToGo(th->threadID,  "Received packet: [%d:%d] %s:%d %s %s:%d (%d) [S:%d A:%d F:%d P:%d R:%d]",
             recv_addr.Network.IfIdx, recv_addr.Network.SubIfIdx,
             src_str, ntohs(tcp_header->SrcPort), 
             (recv_addr.Outbound? "---->": "<----"),

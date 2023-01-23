@@ -1,5 +1,4 @@
 //go:build windows && cgo
-// +build windows,cgo
 
 package windivert
 
@@ -10,8 +9,9 @@ package windivert
 import "C"
 
 import (
-	"log"
 	"unsafe"
+
+	. "github.com/parvit/qpep/logger"
 )
 
 const (
@@ -68,11 +68,11 @@ func EnableDiverterLogging(enable bool) {
 		val = 1
 	}
 
-	log.Println(msg)
+	Info(msg)
 	C.EnableMessageOutputToGo(C.int(val))
 }
 
 //export logMessageToGo
 func logMessageToGo(msg *C.char) {
-	log.Println(C.GoString(msg))
+	Info(C.GoString(msg))
 }

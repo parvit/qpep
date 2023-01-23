@@ -10,7 +10,6 @@ import (
 
 	"crypto/tls"
 	"io"
-	"log"
 	"net"
 	"runtime/debug"
 	"strconv"
@@ -19,7 +18,9 @@ import (
 	"time"
 
 	"github.com/lucas-clemente/quic-go"
+
 	"github.com/parvit/qpep/api"
+	. "github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
 	"github.com/parvit/qpep/windivert"
 	"golang.org/x/net/context"
@@ -38,13 +39,13 @@ var (
 		ListenHost: "0.0.0.0", ListenPort: 9443,
 		GatewayHost: "198.56.1.10", GatewayPort: 443,
 		RedirectedInterfaces: []int64{},
-		QuicStreamTimeout:    2, MultiStream: shared.QuicConfiguration.MultiStream,
+		QuicStreamTimeout:    2, MultiStream: shared.QPepConfig.MultiStream,
 		MaxConnectionRetries: shared.DEFAULT_REDIRECT_RETRIES,
 		IdleTimeout:          time.Duration(300) * time.Second,
 		WinDivertThreads:     1,
 		Verbose:              false,
 	}
-	quicSession             quic.Session
+	quicSession             quic.Connection
 	QuicClientConfiguration = quic.Config{
 		MaxIncomingStreams:      40000,
 		DisablePathMTUDiscovery: true,
@@ -54,7 +55,7 @@ var (
 		//			if err != nil {
 		//				log.Fatal(err)
 		//			}
-		//			log.Printf("Creating qlog file %s.\n", filename)
+		//			Info("Creating qlog file %s.\n", filename)
 		//			return &shared.QLogWriter{Writer: bufio.NewWriter(f)}
 		//		}),
 	}
@@ -79,7 +80,7 @@ type ClientConfig struct {
 func RunClient(ctx context.Context, cancel context.CancelFunc) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v", err)
+			Info("PANIC: %v", err)
 			debug.PrintStack()
 		}
 		if proxyListener != nil {
@@ -87,19 +88,19 @@ func RunClient(ctx context.Context, cancel context.CancelFunc) {
 		}
 		cancel()
 	}()
-	log.Println("Starting TCP-QPEP Tunnel Listener")
+	Info("Starting TCP-QPEP Tunnel Listener")
 
 	// update configuration from flags
 	validateConfiguration()
 
-	log.Printf("Binding to TCP %s:%d", ClientConfiguration.ListenHost, ClientConfiguration.ListenPort)
+	Info("Binding to TCP %s:%d", ClientConfiguration.ListenHost, ClientConfiguration.ListenPort)
 	var err error
 	proxyListener, err = NewClientProxyListener("tcp", &net.TCPAddr{
 		IP:   net.ParseIP(ClientConfiguration.ListenHost),
 		Port: ClientConfiguration.ListenPort,
 	})
 	if err != nil {
-		log.Printf("Encountered error when binding client proxy listener: %s", err)
+		Info("Encountered error when binding client proxy listener: %s", err)
 		return
 	}
 
@@ -115,7 +116,7 @@ func RunClient(ctx context.Context, cancel context.CancelFunc) {
 func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v", err)
+			Info("PANIC: %v", err)
 			debug.PrintStack()
 		}
 		wg.Done()
@@ -129,6 +130,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 	// connection with the server to be on already up
 	initialCheckConnection()
 
+	// Update loop
 	for {
 		select {
 		case <-ctx.Done():
@@ -143,7 +145,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 				if ok, response := gatewayStatusCheck(localAddr, apiAddr, apiPort); ok {
 					publicAddress = response.Address
 					connected = true
-					log.Printf("Server returned public address %s\n", publicAddress)
+					Info("Server returned public address %s\n", publicAddress)
 
 				} else {
 					// if connection is lost then keep the redirection active
@@ -158,7 +160,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 
 			connected = clientStatisticsUpdate(localAddr, apiAddr, apiPort, publicAddress)
 			if !connected {
-				log.Printf("Error during statistics update from server\n")
+				Info("Error during statistics update from server\n")
 
 				// if connection is lost then keep the redirection active
 				// for a certain number of retries then terminate to not keep
@@ -182,7 +184,7 @@ func initialCheckConnection() bool {
 	preferProxy := ClientConfiguration.PreferProxy
 
 	if preferProxy {
-		log.Printf("Proxy preference set, trying to connect...\n")
+		Info("Proxy preference set, trying to connect...\n")
 		initProxy()
 		return false
 	}
@@ -199,35 +201,35 @@ func failedCheckConnection() bool {
 		// First half of tries with proxy, then diverter, then stop
 		if shared.UsingProxy && keepRedirectionRetries < maxRetries/2 {
 			stopProxy()
-			log.Printf("Connection failed and half retries exhausted, trying with diverter\n")
+			Info("Connection failed and half retries exhausted, trying with diverter\n")
 			return initDiverter()
 		}
 		if keepRedirectionRetries > 0 {
-			log.Printf("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
+			Info("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
 			stopProxy()
 			initProxy()
 			return false
 		}
 
-		log.Printf("Connection failed and retries exhausted, redirection stopped\n")
+		Info("Connection failed and retries exhausted, redirection stopped\n")
 		stopDiverter()
 		return true
 	} else {
 		// First half of tries with diverter, then proxy, then stop
 		if !shared.UsingProxy && keepRedirectionRetries < maxRetries/2 {
 			stopDiverter()
-			log.Printf("Connection failed and half retries exhausted, trying with proxy\n")
+			Info("Connection failed and half retries exhausted, trying with proxy\n")
 			initProxy()
 			return false
 		}
 		if keepRedirectionRetries > 0 {
-			log.Printf("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
+			Info("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
 			stopDiverter()
 			initDiverter()
 			return false
 		}
 
-		log.Printf("Connection failed and retries exhausted, redirection stopped\n")
+		Info("Connection failed and retries exhausted, redirection stopped\n")
 		stopProxy()
 		return true
 	}
@@ -254,11 +256,11 @@ func initDiverter() bool {
 		}
 	}
 
-	log.Printf("WinDivert: %v %v %v %v %v %v\n", gatewayHost, listenHost, gatewayPort, listenPort, threads, redirectedInetID)
+	Info("WinDivert: %v %v %v %v %v %v\n", gatewayHost, listenHost, gatewayPort, listenPort, threads, redirectedInetID)
 	code := windivert.InitializeWinDivertEngine(gatewayHost, listenHost, gatewayPort, listenPort, threads, redirectedInetID)
-	log.Printf("WinDivert code: %v\n", code)
+	Info("WinDivert code: %v\n", code)
 	if code != windivert.DIVERT_OK {
-		log.Printf("ERROR: Could not initialize WinDivert engine, code %d\n", code)
+		Info("ERROR: Could not initialize WinDivert engine, code %d\n", code)
 	}
 	return code != windivert.DIVERT_OK
 }
@@ -282,7 +284,7 @@ func stopProxy() {
 func listenTCPConn(wg *sync.WaitGroup) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v", err)
+			Info("PANIC: %v", err)
 			debug.PrintStack()
 		}
 		wg.Done()
@@ -291,9 +293,9 @@ func listenTCPConn(wg *sync.WaitGroup) {
 		conn, err := proxyListener.Accept()
 		if err != nil {
 			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				log.Printf("Temporary error when accepting connection: %s", netErr)
+				Info("Temporary error when accepting connection: %s", netErr)
 			}
-			log.Printf("Unrecoverable error while accepting connection: %s", err)
+			Info("Unrecoverable error while accepting connection: %s", err)
 			return
 		}
 
@@ -304,11 +306,11 @@ func listenTCPConn(wg *sync.WaitGroup) {
 func handleTCPConn(tcpConn net.Conn) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Printf("PANIC: %v", err)
+			Info("PANIC: %v", err)
 			debug.PrintStack()
 		}
 	}()
-	log.Printf("Accepting TCP connection from %s with destination of %s", tcpConn.RemoteAddr().String(), tcpConn.LocalAddr().String())
+	Info("Accepting TCP connection from %s with destination of %s", tcpConn.RemoteAddr().String(), tcpConn.LocalAddr().String())
 	defer tcpConn.Close()
 
 	var quicStream quic.Stream = nil
@@ -317,14 +319,14 @@ func handleTCPConn(tcpConn net.Conn) {
 		//if we have already opened a quic session, lets check if we've expired our stream
 		if quicSession != nil {
 			var err error
-			log.Printf("Trying to open on existing session")
+			Info("Trying to open on existing session")
 			quicStream, err = quicSession.OpenStream()
 			// if we weren't able to open a quicStream on that session (usually inactivity timeout), we can try to open a new session
 			if err != nil {
-				log.Printf("Unable to open new stream on existing QUIC session: %s\n", err)
+				Info("Unable to open new stream on existing QUIC session: %s\n", err)
 				quicStream = nil
 			} else {
-				log.Printf("Opened a new stream: %d", quicStream.StreamID())
+				Info("Opened a new stream: %d", quicStream.StreamID())
 			}
 		}
 	}
@@ -342,7 +344,7 @@ func handleTCPConn(tcpConn net.Conn) {
 		quicStream, err = quicSession.OpenStreamSync(context.Background())
 		// if we cannot open a stream on this session, send a TCP RST and let the client decide to try again
 		if err != nil {
-			log.Printf("Unable to open QUIC stream: %s\n", err)
+			Info("Unable to open QUIC stream: %s\n", err)
 			return
 		}
 	}
@@ -361,7 +363,7 @@ func handleTCPConn(tcpConn net.Conn) {
 	// divert check
 	diverted, srcPort, dstPort, srcAddress, dstAddress := windivert.GetConnectionStateData(sessionHeader.SourceAddr.Port)
 	if diverted == windivert.DIVERT_OK {
-		log.Printf("Diverted connection: %v:%v %v:%v", srcAddress, srcPort, dstAddress, dstPort)
+		Info("Diverted connection: %v:%v %v:%v", srcAddress, srcPort, dstAddress, dstPort)
 
 		sessionHeader.SourceAddr = &net.TCPAddr{
 			IP:   net.ParseIP(srcAddress),
@@ -372,10 +374,10 @@ func handleTCPConn(tcpConn net.Conn) {
 			Port: dstPort,
 		}
 
-		log.Printf("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
+		Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
 		_, err := quicStream.Write(sessionHeader.ToBytes())
 		if err != nil {
-			log.Printf("Error writing to quic stream: %s", err.Error())
+			Info("Error writing to quic stream: %s", err.Error())
 		}
 	} else {
 		tcpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
@@ -387,7 +389,7 @@ func handleTCPConn(tcpConn net.Conn) {
 		req, err := http.ReadRequest(rd)
 		if err != nil {
 			tcpConn.Close()
-			log.Printf("Failed to parse request: %v\n", err)
+			Info("Failed to parse request: %v\n", err)
 			return
 		}
 
@@ -396,7 +398,7 @@ func handleTCPConn(tcpConn net.Conn) {
 			address, port, proxyable := getAddressPortFromHost(req.Host)
 			if !proxyable {
 				tcpConn.Close()
-				log.Printf("Non proxyable request\n")
+				Info("Non proxyable request\n")
 				return
 			}
 
@@ -405,17 +407,17 @@ func handleTCPConn(tcpConn net.Conn) {
 				Port: port,
 			}
 
-			log.Printf("Proxied connection")
-			log.Printf("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
+			Info("Proxied connection")
+			Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
 			_, err := quicStream.Write(sessionHeader.ToBytes())
 			if err != nil {
-				log.Printf("Error writing to quic stream: %s", err.Error())
+				Info("Error writing to quic stream: %s", err.Error())
 			}
 
-			log.Printf("Sending captured GET request\n")
+			Info("Sending captured GET request\n")
 			err = req.Write(quicStream)
 			if err != nil {
-				log.Printf("Error writing to tcp stream: %s", err.Error())
+				Info("Error writing to tcp stream: %s", err.Error())
 			}
 			break
 
@@ -423,7 +425,7 @@ func handleTCPConn(tcpConn net.Conn) {
 			address, port, proxyable := getAddressPortFromHost(req.Host)
 			if !proxyable {
 				tcpConn.Close()
-				log.Printf("Non proxyable request\n")
+				Info("Non proxyable request\n")
 				return
 			}
 
@@ -447,11 +449,11 @@ func handleTCPConn(tcpConn net.Conn) {
 			t.Write(tcpConn)
 			buf.Reset()
 
-			log.Printf("Proxied connection")
-			log.Printf("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
+			Info("Proxied connection")
+			Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
 			_, err := quicStream.Write(sessionHeader.ToBytes())
 			if err != nil {
-				log.Printf("Error writing to quic stream: %s", err.Error())
+				Info("Error writing to quic stream: %s", err.Error())
 			}
 			break
 		default:
@@ -469,7 +471,7 @@ func handleTCPConn(tcpConn net.Conn) {
 
 			t.Write(tcpConn)
 			tcpConn.Close()
-			log.Printf("Proxy returns BadGateway\n")
+			Info("Proxy returns BadGateway\n")
 			return
 		}
 	}
@@ -485,7 +487,7 @@ func handleTCPConn(tcpConn net.Conn) {
 
 		err1 := dst.SetLinger(1)
 		if err1 != nil {
-			log.Printf("error on setLinger: %s\n", err1)
+			Info("error on setLinger: %s\n", err1)
 		}
 
 		var buffSize = INITIAL_BUFF_SIZE
@@ -506,7 +508,7 @@ func handleTCPConn(tcpConn net.Conn) {
 				if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 					continue
 				}
-				//log.Printf("Error on Copy %s\n", err)
+				//Info("Error on Copy %s\n", err)
 				break
 			}
 
@@ -515,7 +517,7 @@ func handleTCPConn(tcpConn net.Conn) {
 				buffSize = INITIAL_BUFF_SIZE
 			}
 		}
-		//log.Printf("Finished Copying Stream ID %d, TCP Conn %s->%s\n", src.StreamID(), dst.LocalAddr().String(), dst.RemoteAddr().String())
+		//Info("Finished Copying Stream ID %d, TCP Conn %s->%s\n", src.StreamID(), dst.LocalAddr().String(), dst.RemoteAddr().String())
 	}
 	streamTCPtoQUIC := func(dst quic.Stream, src *net.TCPConn) {
 		defer func() {
@@ -526,7 +528,7 @@ func handleTCPConn(tcpConn net.Conn) {
 
 		err1 := src.SetLinger(1)
 		if err1 != nil {
-			log.Printf("error on setLinger: %s\n", err1)
+			Info("error on setLinger: %s\n", err1)
 		}
 
 		var buffSize = INITIAL_BUFF_SIZE
@@ -547,7 +549,7 @@ func handleTCPConn(tcpConn net.Conn) {
 				if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 					continue
 				}
-				//log.Printf("Error on Copy %s\n", err)
+				//Info("Error on Copy %s\n", err)
 				break
 			}
 
@@ -556,11 +558,11 @@ func handleTCPConn(tcpConn net.Conn) {
 				buffSize = INITIAL_BUFF_SIZE
 			}
 		}
-		//log.Printf("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
+		//Info("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
 	}
 
 	//Proxy all stream content from quic to TCP and from TCP to quic
-	log.Printf("== Stream %d Start ==", quicStream.StreamID())
+	Info("== Stream %d Start ==", quicStream.StreamID())
 	go streamTCPtoQUIC(quicStream, tcpConn.(*net.TCPConn))
 	go streamQUICtoTCP(tcpConn.(*net.TCPConn), quicStream)
 
@@ -572,7 +574,7 @@ func handleTCPConn(tcpConn net.Conn) {
 	quicStream.CancelWrite(0)
 	quicStream.CancelRead(0)
 	quicStream.Close()
-	log.Printf("== Stream %d Done ==", quicStream.StreamID())
+	Info("== Stream %d Done ==", quicStream.StreamID())
 }
 
 func getAddressPortFromHost(host string) (net.IP, int, bool) {
@@ -597,39 +599,39 @@ func getAddressPortFromHost(host string) (net.IP, int, bool) {
 	return address, int(port), proxyable
 }
 
-func openQuicSession() (quic.Session, error) {
+func openQuicSession() (quic.Connection, error) {
 	var err error
-	var session quic.Session
+	var session quic.Connection
 	tlsConf := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qpep"}}
 	gatewayPath := ClientConfiguration.GatewayHost + ":" + strconv.Itoa(ClientConfiguration.GatewayPort)
 	quicClientConfig := QuicClientConfiguration
-	log.Printf("Dialing QUIC Session: %s\n", gatewayPath)
+	Info("Dialing QUIC Session: %s\n", gatewayPath)
 	for i := 0; i < ClientConfiguration.MaxConnectionRetries; i++ {
 		session, err = quic.DialAddr(gatewayPath, tlsConf, &quicClientConfig)
 		if err == nil {
 			return session, nil
 		} else {
-			log.Printf("Failed to Open QUIC Session: %s\n    Retrying...\n", err)
+			Info("Failed to Open QUIC Session: %s\n    Retrying...\n", err)
 		}
 	}
 
-	log.Printf("Max Retries Exceeded. Unable to Open QUIC Session: %s\n", err)
+	Info("Max Retries Exceeded. Unable to Open QUIC Session: %s\n", err)
 	return nil, err
 }
 
 func gatewayStatusCheck(localAddr, apiAddr string, apiPort int) (bool, *api.EchoResponse) {
 	if response := api.RequestEcho(localAddr, apiAddr, apiPort, true); response != nil {
-		log.Printf("Gateway Echo OK\n")
+		Info("Gateway Echo OK\n")
 		return true, response
 	}
-	log.Printf("Gateway Echo FAILED\n")
+	Info("Gateway Echo FAILED\n")
 	return false, nil
 }
 
 func clientStatisticsUpdate(localAddr, apiAddr string, apiPort int, publicAddress string) bool {
 	response := api.RequestStatistics(localAddr, apiAddr, apiPort, publicAddress)
 	if response == nil {
-		log.Printf("Statistics update failed, resetting connection status\n")
+		Info("Statistics update failed, resetting connection status\n")
 		return false
 	}
 
@@ -645,17 +647,17 @@ func clientStatisticsUpdate(localAddr, apiAddr string, apiPort int, publicAddres
 
 func validateConfiguration() {
 	// copy values for client configuration
-	ClientConfiguration.GatewayHost = shared.QuicConfiguration.GatewayIP
-	ClientConfiguration.GatewayPort = shared.QuicConfiguration.GatewayPort
-	ClientConfiguration.APIPort = shared.QuicConfiguration.GatewayAPIPort
-	ClientConfiguration.ListenHost, ClientConfiguration.RedirectedInterfaces =
-		shared.GetDefaultLanListeningAddress(shared.QuicConfiguration.ListenIP, ClientConfiguration.GatewayHost)
-	ClientConfiguration.ListenPort = shared.QuicConfiguration.ListenPort
-	ClientConfiguration.MaxConnectionRetries = shared.QuicConfiguration.MaxConnectionRetries
-	ClientConfiguration.MultiStream = shared.QuicConfiguration.MultiStream
-	ClientConfiguration.WinDivertThreads = shared.QuicConfiguration.WinDivertThreads
-	ClientConfiguration.PreferProxy = shared.QuicConfiguration.PreferProxy
-	ClientConfiguration.Verbose = shared.QuicConfiguration.Verbose
+	ClientConfiguration.GatewayHost = shared.QPepConfig.GatewayHost
+	ClientConfiguration.GatewayPort = shared.QPepConfig.GatewayPort
+	ClientConfiguration.APIPort = shared.QPepConfig.GatewayAPIPort
+	ClientConfiguration.ListenHost, ClientConfiguration.RedirectedInterfaces = shared.GetDefaultLanListeningAddress(
+		shared.QPepConfig.ListenHost, shared.QPepConfig.GatewayHost)
+	ClientConfiguration.ListenPort = shared.QPepConfig.ListenPort
+	ClientConfiguration.MaxConnectionRetries = shared.QPepConfig.MaxConnectionRetries
+	ClientConfiguration.MultiStream = shared.QPepConfig.MultiStream
+	ClientConfiguration.WinDivertThreads = shared.QPepConfig.WinDivertThreads
+	ClientConfiguration.PreferProxy = shared.QPepConfig.PreferProxy
+	ClientConfiguration.Verbose = shared.QPepConfig.Verbose
 
 	// panic if configuration is inconsistent
 	shared.AssertParamIP("gateway host", ClientConfiguration.GatewayHost)
@@ -674,9 +676,6 @@ func validateConfiguration() {
 
 	shared.AssertParamNumeric("auto-redirected interfaces", len(ClientConfiguration.RedirectedInterfaces), 1, 256)
 
-	// override the configured listening address with the discovered one
-	// if not set explicitly
-	shared.QuicConfiguration.ListenIP = ClientConfiguration.ListenHost
 	// validation ok
-	log.Printf("Client configuration validation OK\n")
+	Info("Client configuration validation OK\n")
 }
