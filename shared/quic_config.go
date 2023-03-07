@@ -2,7 +2,7 @@ package shared
 
 import (
 	"bufio"
-	"github.com/Project-Faster/quic-go"
+	"github.com/lucas-clemente/quic-go"
 	"time"
 )
 

@@ -20,8 +20,8 @@ require (
 
 require (
 	bou.ke/monkey v1.0.2
-	github.com/Project-Faster/quic-go v0.0.0-20230209052722-fd67b0616c6d
 	github.com/jessevdk/go-flags v1.5.0
+	github.com/lucas-clemente/quic-go v0.30.0
 	github.com/nyaosorg/go-windows-dbg v0.0.0-20210914123807-2acba179a4e5
 	github.com/stretchr/testify v1.5.1
 )
@@ -39,6 +39,8 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
+	github.com/marten-seemann/qtls-go1-18 v0.1.3 // indirect
+	github.com/marten-seemann/qtls-go1-19 v0.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/onsi/ginkgo/v2 v2.8.0 // indirect

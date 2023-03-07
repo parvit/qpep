@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/Project-Faster/quic-go"
+	"github.com/lucas-clemente/quic-go"
 	"github.com/parvit/qpep/api"
 	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
