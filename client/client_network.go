@@ -164,10 +164,18 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	_ = tcpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 
 	buf := bytes.NewBuffer(make([]byte, 0, INITIAL_BUFF_SIZE))
-	if n, err := io.Copy(buf, tcpConn); err != nil || n == 0 {
-		_ = tcpConn.Close()
+	n, err := io.Copy(buf, tcpConn)
+	if n == 0 {
 		logger.Error("Failed to receive request: %v\n", err)
 		return shared.ErrNonProxyableRequest
+	}
+	if err != nil {
+		nErr, ok := err.(net.Error)
+		if !ok || (ok && (!nErr.Timeout() && !nErr.Temporary())) {
+			_ = tcpConn.Close()
+			logger.Error("Failed to receive request: %v\n", err)
+			return shared.ErrNonProxyableRequest
+		}
 	}
 
 	rd := bufio.NewReader(buf)
@@ -196,7 +204,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	case http.MethodGet:
 		address, port, proxyable := getAddressPortFromHost(req.Host)
 		if !proxyable {
-			tcpConn.Close()
+			_ = tcpConn.Close()
 			logger.Info("Non proxyable request\n")
 			return shared.ErrNonProxyableRequest
 		}
@@ -210,6 +218,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", header.SourceAddr, header.DestAddr)
 		_, err := stream.Write(header.ToBytes())
 		if err != nil {
+			_ = tcpConn.Close()
 			logger.Error("Error writing to quic stream: %s", err.Error())
 			return shared.ErrFailed
 		}
@@ -217,6 +226,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		logger.Info("Sending captured GET request\n")
 		err = req.Write(stream)
 		if err != nil {
+			_ = tcpConn.Close()
 			logger.Error("Error writing to tcp stream: %s", err.Error())
 			return shared.ErrFailed
 		}
@@ -225,7 +235,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	case http.MethodConnect:
 		address, port, proxyable := getAddressPortFromHost(req.Host)
 		if !proxyable {
-			tcpConn.Close()
+			_ = tcpConn.Close()
 			logger.Error("Non proxyable request\n")
 			return shared.ErrNonProxyableRequest
 		}
@@ -254,6 +264,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", header.SourceAddr, header.DestAddr)
 		_, err := stream.Write(header.ToBytes())
 		if err != nil {
+			_ = tcpConn.Close()
 			logger.Error("Error writing to quic stream: %s", err.Error())
 			return shared.ErrFailed
 		}
@@ -272,7 +283,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		}
 
 		t.Write(tcpConn)
-		tcpConn.Close()
+		_ = tcpConn.Close()
 		logger.Error("Proxy returns BadGateway\n")
 		return shared.ErrNonProxyableRequest
 	}

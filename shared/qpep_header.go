@@ -123,8 +123,9 @@ func QPepHeaderFromBytes(stream io.Reader) (*QPepHeader, error) {
 	destPortEnd := destIpEnd + 2
 
 	byteInput := make([]byte, destPortEnd)
-	readDataBytes, err := stream.Read(byteInput)
-	if readDataBytes != destPortEnd || err != nil {
+	readDataBytes, _ := stream.Read(byteInput)
+
+	if readDataBytes != destPortEnd {
 		return nil, ErrInvalidHeaderDataLength
 	}
 
