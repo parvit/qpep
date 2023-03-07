@@ -262,7 +262,7 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				log.Println("Stopping connection check watchdog")
 				break CHECKLOOP
 
-			case <-time.After(1 * time.Second):
+			case <-time.After(10 * time.Second):
 				if !clientActive && !serverActive {
 					state = stateDisconnected
 					pubAddress = ""

@@ -120,11 +120,10 @@ func handleQuicStream(stream quic.Stream) {
 
 	//we exit (and close the TCP connection) once both streams are done copying or timeout
 	streamWait.Wait()
-	tcpConn.Close()
 
 	stream.CancelRead(0)
 	stream.CancelWrite(0)
-	stream.Close()
+	// stream.Close()
 	logger.Info(">> Closing TCP Conn %s->%s\n", proxyAddress, tcpConn.RemoteAddr().String())
 }
 
@@ -142,7 +141,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 	setLinger(dst)
 
-	var timeoutCounter = 10
 	var loopTimeout = 100 * time.Millisecond
 
 	for {
@@ -152,41 +150,40 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		default:
 		}
 
-		tm := time.Now().Add(loopTimeout)
-		_ = src.SetReadDeadline(tm)
-		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
-
 		var written int64 = 0
 		var err error
 
 		if speedLimit > 0 {
+			tm := time.Now().Add(loopTimeout)
+			_ = src.SetReadDeadline(tm)
+			_ = src.SetWriteDeadline(tm)
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
+
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.Copy(dst, io.LimitReader(src, speedLimit/10))
+			written, err = io.CopyN(dst, src, speedLimit/10)
 			var end = limit.Sub(time.Now())
 
-			logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
+			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
 			time.Sleep(end)
 
 		} else {
-			written, err = io.Copy(dst, src)
-			logger.Debug("q -> t: %d", written)
+			written, err = io.CopyN(dst, src, 32*1024*1024)
+			//logger.Debug("q -> t: %d", written)
 		}
 
 		api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 
 		if err != nil || written == 0 {
-			if nErr, ok := err.(net.Error); timeoutCounter > 0 && ok && (nErr.Timeout() || nErr.Temporary()) {
-				timeoutCounter--
+			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
 			//log.Printf("Error on Copy %s\n", err)
-			logger.Debug("finish q -> t")
+			//logger.Debug("finish q -> t")
+			dst.Close()
 			return
 		}
-		timeoutCounter = 10
 	}
 }
 
@@ -210,27 +207,27 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		default:
 		}
 
-		tm := time.Now().Add(loopTimeout)
-		_ = src.SetReadDeadline(tm)
-		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
-
 		var written int64 = 0
 		var err error
 
 		if speedLimit > 0 {
+			tm := time.Now().Add(loopTimeout)
+			_ = src.SetReadDeadline(tm)
+			_ = src.SetWriteDeadline(tm)
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
+
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.Copy(dst, io.LimitReader(src, speedLimit/10))
+			written, err = io.CopyN(dst, src, speedLimit/10)
 			var end = limit.Sub(time.Now())
 
-			logger.Debug("t -> q: %d / %v", written, end.Nanoseconds())
+			//logger.Debug("t -> q: %d / %v", written, end.Nanoseconds())
 			time.Sleep(end)
 
 		} else {
-			written, err = io.Copy(dst, src)
-			logger.Debug("t -> q: %d", written)
+			written, err = io.CopyN(dst, src, 32*1024*1024)
+			//logger.Debug("t -> q: %d", written)
 		}
 
 		api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
@@ -239,7 +236,8 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
-			logger.Debug("finish t -> q")
+			//logger.Debug("finish t -> q")
+			dst.Close()
 			return
 		}
 	}

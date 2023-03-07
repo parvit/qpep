@@ -308,6 +308,9 @@ func (s *statistics) DeleteMappedAddress(source string) {
 		return
 	}
 
+	s.semCounters.Lock()
+	defer s.semCounters.Unlock()
+
 	key := "host-" + mapped
 	if counter, found := s.counters[key]; found && counter > 1 {
 		s.counters[key]--

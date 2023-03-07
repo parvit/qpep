@@ -110,11 +110,9 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	//we exit (and close the TCP connection) once both streams are done copying
 	streamWait.Wait()
-	tcpConn.Close()
 
 	quicStream.CancelWrite(0)
 	quicStream.CancelRead(0)
-	quicStream.Close()
 	logger.Info("== Stream %d End ==", quicStream.StreamID())
 
 	if !ClientConfiguration.MultiStream {
@@ -285,35 +283,28 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.Stream, src net.Conn) {
 	defer func() {
 		_ = recover()
+		_ = src.Close()
+		_ = dst.Close()
+
 		streamWait.Done()
 	}()
 
 	setLinger(src)
 
-	var buffSize = INITIAL_BUFF_SIZE
-	var loopTimeout = 150 * time.Millisecond
 	for {
 		select {
 		case <-ctx.Done():
+			dst.Close()
 			return
 		default:
 		}
-		src.SetReadDeadline(time.Now().Add(loopTimeout))
-		src.SetWriteDeadline(time.Now().Add(loopTimeout))
-		dst.SetReadDeadline(time.Now().Add(loopTimeout))
-		dst.SetWriteDeadline(time.Now().Add(loopTimeout))
 
-		written, err := io.Copy(dst, io.LimitReader(src, buffSize))
-		if err != nil || written == 0 {
+		_, err := io.CopyN(dst, src, 32*1024*1024)
+		if err != nil {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
-			break
-		}
-
-		buffSize = int64(written * 2)
-		if buffSize < INITIAL_BUFF_SIZE {
-			buffSize = INITIAL_BUFF_SIZE
+			return
 		}
 	}
 	//logger.Info("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
@@ -323,35 +314,27 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Conn, src quic.Stream) {
 	defer func() {
 		_ = recover()
+		src.CancelRead(0)
+		_ = dst.Close()
+
 		streamWait.Done()
 	}()
 
 	setLinger(dst)
 
-	var buffSize = INITIAL_BUFF_SIZE
-	var loopTimeout = 150 * time.Millisecond
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 		}
-		src.SetReadDeadline(time.Now().Add(loopTimeout))
-		src.SetWriteDeadline(time.Now().Add(loopTimeout))
-		dst.SetReadDeadline(time.Now().Add(loopTimeout))
-		dst.SetWriteDeadline(time.Now().Add(loopTimeout))
 
-		written, err := io.Copy(dst, io.LimitReader(src, buffSize))
-		if err != nil || written == 0 {
+		_, err := io.CopyN(dst, src, 32*1024*1024)
+		if err != nil {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
-			break
-		}
-
-		buffSize = int64(written * 2)
-		if buffSize < INITIAL_BUFF_SIZE {
-			buffSize = INITIAL_BUFF_SIZE
+			return
 		}
 	}
 	//logger.Info("Finished Copying Stream ID %d, TCP Conn %s->%s\n", srcConn.StreamID(), dst.LocalAddr().String(), dst.RemoteAddr().String())
