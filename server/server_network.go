@@ -48,9 +48,11 @@ func listenQuicConn(quicSession quic.Connection) {
 			}
 			return
 		}
-		logger.Info("Opening QUIC StreamID: %d\n", stream.StreamID())
-
-		go handleQuicStream(stream)
+		go func() {
+			logger.Debug(">> QUIC StreamID START: %d\n", stream.StreamID())
+			handleQuicStream(stream)
+			logger.Debug(">> QUIC StreamID END: %d\n", stream.StreamID())
+		}()
 	}
 }
 
@@ -85,7 +87,7 @@ func handleQuicStream(stream quic.Stream) {
 		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, ServerConfiguration.APIPort)
 	}
 
-	logger.Info(">> Opening TCP Conn to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
+	logger.Debug(">> Opening TCP Conn to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
 	dial := &net.Dialer{
 		LocalAddr: &net.TCPAddr{IP: net.ParseIP(ServerConfiguration.ListenHost)},
 		Timeout:   1 * time.Second,
@@ -98,7 +100,7 @@ func handleQuicStream(stream quic.Stream) {
 		stream.Close()
 		return
 	}
-	logger.Info(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
+	logger.Debug(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
 
 	trackedAddress := qpepHeader.SourceAddr.IP.String()
 	proxyAddress := tcpConn.LocalAddr().String()
@@ -110,22 +112,32 @@ func handleQuicStream(stream quic.Stream) {
 		api.Statistics.DecrementCounter(1.0, api.TOTAL_CONNECTIONS)
 	}()
 
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var streamWait sync.WaitGroup
 	streamWait.Add(2)
 
 	go handleQuicToTcp(ctx, &streamWait, srcLimit, tcpConn, stream, proxyAddress, trackedAddress)
 	go handleTcpToQuic(ctx, &streamWait, dstLimit, stream, tcpConn, trackedAddress)
+	go func() {
+		<-time.After(5 * time.Second)
+		cancel()
+	}()
 
 	//we exit (and close the TCP connection) once both streams are done copying or timeout
 	streamWait.Wait()
 
 	stream.CancelRead(0)
 	stream.CancelWrite(0)
-	// stream.Close()
-	logger.Info(">> Closing TCP Conn %s->%s\n", proxyAddress, tcpConn.RemoteAddr().String())
+	stream.Close()
+	tcpConn.Close()
+
+	logger.Debug(">> Closing TCP Conn %s->%s\n", proxyAddress, tcpConn.RemoteAddr().String())
 }
+
+const (
+	BUFFER_SIZE = 512 * 1024
+)
 
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit int64,
 	dst net.Conn, src quic.Stream, proxyAddress, trackedAddress string) {
@@ -133,6 +145,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 	defer func() {
 		_ = recover()
 
+		dst.Close()
 		api.Statistics.DeleteMappedAddress(proxyAddress)
 		streamWait.Done()
 	}()
@@ -141,7 +154,8 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 	setLinger(dst)
 
-	var loopTimeout = 100 * time.Millisecond
+	var loopTimeout = 1 * time.Second
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -153,13 +167,13 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		var written int64 = 0
 		var err error
 
-		if speedLimit > 0 {
-			tm := time.Now().Add(loopTimeout)
-			_ = src.SetReadDeadline(tm)
-			_ = src.SetWriteDeadline(tm)
-			_ = dst.SetReadDeadline(tm)
-			_ = dst.SetWriteDeadline(tm)
+		tm := time.Now().Add(loopTimeout)
+		_ = src.SetReadDeadline(tm)
+		_ = src.SetWriteDeadline(tm)
+		_ = dst.SetReadDeadline(tm)
+		_ = dst.SetWriteDeadline(tm)
 
+		if speedLimit > 0 {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
 			written, err = io.CopyN(dst, src, speedLimit/10)
@@ -169,11 +183,11 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 
 		} else {
-			written, err = io.CopyN(dst, src, 32*1024*1024)
-			//logger.Debug("q -> t: %d", written)
+			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+			logger.Debug("q -> t: %d", written)
 		}
 
-		api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
+		go api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
@@ -181,7 +195,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			}
 			//log.Printf("Error on Copy %s\n", err)
 			//logger.Debug("finish q -> t")
-			dst.Close()
 			return
 		}
 	}
@@ -193,12 +206,15 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 	defer func() {
 		_ = recover()
 
+		dst.Close()
 		streamWait.Done()
 	}()
 
 	setLinger(src)
 
-	var loopTimeout = 100 * time.Millisecond
+	var loopTimeout = 1 * time.Second
+
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -210,13 +226,13 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		var written int64 = 0
 		var err error
 
-		if speedLimit > 0 {
-			tm := time.Now().Add(loopTimeout)
-			_ = src.SetReadDeadline(tm)
-			_ = src.SetWriteDeadline(tm)
-			_ = dst.SetReadDeadline(tm)
-			_ = dst.SetWriteDeadline(tm)
+		tm := time.Now().Add(loopTimeout)
+		_ = src.SetReadDeadline(tm)
+		_ = src.SetWriteDeadline(tm)
+		_ = dst.SetReadDeadline(tm)
+		_ = dst.SetWriteDeadline(tm)
 
+		if speedLimit > 0 {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
 			written, err = io.CopyN(dst, src, speedLimit/10)
@@ -226,18 +242,17 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 
 		} else {
-			written, err = io.CopyN(dst, src, 32*1024*1024)
-			//logger.Debug("t -> q: %d", written)
+			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+			logger.Debug("t -> q: %d", written)
 		}
 
-		api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
+		go api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
 			//logger.Debug("finish t -> q")
-			dst.Close()
 			return
 		}
 	}

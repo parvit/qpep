@@ -205,7 +205,7 @@ func failedCheckConnection() bool {
 		}
 		if keepRedirectionRetries > 0 {
 			logger.Info("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
-			stopProxy()
+			//stopProxy()
 			initProxy()
 			return false
 		}

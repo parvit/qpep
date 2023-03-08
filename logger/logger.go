@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	log "github.com/rs/zerolog"
 	stdlog "log"
@@ -54,8 +55,9 @@ func SetupLogger(logName string) {
 	_logFile = getLoggerFile(logName)
 
 	log.SetGlobalLevel(log.InfoLevel)
+	log.TimeFieldFormat = time.StampMilli
 
-	_log = log.New(_logFile).Level(log.DebugLevel).
+	_log = log.New(_logFile).Level(log.InfoLevel).
 		With().Timestamp().Logger()
 }
 
@@ -85,6 +87,9 @@ func Info(format string, values ...interface{}) {
 // Debug Outputs a new formatted string with the provided parameters to the logger instance with Debug level
 // Outputs the same data to the OutputDebugString facility if os is Windows and level is set to Debug
 func Debug(format string, values ...interface{}) {
+	if log.GlobalLevel() != log.DebugLevel {
+		return
+	}
 	_log.Debug().Msgf(format, values...)
 	stdlog.Printf(format, values...)
 	if runtime.GOOS == "windows" && _log.GetLevel() >= log.DebugLevel {

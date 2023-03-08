@@ -5,6 +5,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/version"
+	log "github.com/rs/zerolog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -66,6 +67,10 @@ type QPepService struct {
 // ServiceMain method wraps the starting logic of the qpep service
 func ServiceMain() int {
 	flags.ParseFlags(os.Args)
+
+	if flags.Globals.Verbose {
+		log.SetGlobalLevel(log.DebugLevel)
+	}
 
 	execPath, err := os.Executable()
 	if err != nil {

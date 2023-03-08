@@ -30,6 +30,10 @@ var (
 	quicSession quic.Connection
 )
 
+const (
+	BUFFER_SIZE = 512 * 1024
+)
+
 // listenTCPConn method implements the routine that listens to incoming diverted/proxied connections
 func listenTCPConn(wg *sync.WaitGroup) {
 	defer func() {
@@ -101,18 +105,26 @@ func handleTCPConn(tcpConn net.Conn) {
 		logger.OnError(err, "opening proxy connection")
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), ClientConfiguration.IdleTimeout)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	//Proxy all stream content from quic to TCP and from TCP to quic
 	logger.Info("== Stream %d Start ==", quicStream.StreamID())
 	go handleTcpToQuic(ctx, &streamWait, quicStream, tcpConn)
 	go handleQuicToTcp(ctx, &streamWait, tcpConn, quicStream)
+	go func() {
+		<-time.After(5 * time.Second)
+		cancel()
+	}()
 
 	//we exit (and close the TCP connection) once both streams are done copying
 	streamWait.Wait()
 
 	quicStream.CancelWrite(0)
 	quicStream.CancelRead(0)
+	quicStream.Close()
+
+	tcpConn.Close()
+
 	logger.Info("== Stream %d End ==", quicStream.StreamID())
 
 	if !ClientConfiguration.MultiStream {
@@ -294,24 +306,29 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.Stream, src net.Conn) {
 	defer func() {
 		_ = recover()
-		_ = src.Close()
-		_ = dst.Close()
 
 		streamWait.Done()
 	}()
 
 	setLinger(src)
 
+	var loopTimeout = 1 * time.Second
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 	for {
 		select {
 		case <-ctx.Done():
-			dst.Close()
 			return
 		default:
 		}
 
-		_, err := io.CopyN(dst, src, 32*1024*1024)
-		if err != nil {
+		tm := time.Now().Add(loopTimeout)
+		_ = src.SetReadDeadline(tm)
+		_ = src.SetWriteDeadline(tm)
+		_ = dst.SetReadDeadline(tm)
+		_ = dst.SetWriteDeadline(tm)
+
+		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
@@ -325,13 +342,14 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Conn, src quic.Stream) {
 	defer func() {
 		_ = recover()
-		src.CancelRead(0)
-		_ = dst.Close()
 
 		streamWait.Done()
 	}()
 
 	setLinger(dst)
+
+	var loopTimeout = 1 * time.Second
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -340,8 +358,16 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		default:
 		}
 
-		_, err := io.CopyN(dst, src, 32*1024*1024)
-		if err != nil {
+		tm := time.Now().Add(loopTimeout)
+		_ = src.SetReadDeadline(tm)
+		_ = src.SetWriteDeadline(tm)
+		_ = dst.SetReadDeadline(tm)
+		_ = dst.SetWriteDeadline(tm)
+
+		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+		logger.Debug("q -> t: %d", written)
+
+		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
 			}
