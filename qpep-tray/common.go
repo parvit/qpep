@@ -239,6 +239,8 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 		stateConnected    = 2
 	)
 
+	var state = stateDisconnected
+
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
@@ -247,13 +249,51 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 			}
 		}()
 
-		var state = stateDisconnected
-		var pubAddress = ""
 		var flip = 0
 		var animIcons = [][]byte{
 			icons.MainIconWaiting,
 			icons.MainIconData,
 		}
+
+	ICONLOOP:
+		for {
+			select {
+			case <-ctx.Done():
+				break ICONLOOP
+
+			case <-time.After(1 * time.Second):
+				if !clientActive && !serverActive {
+					state = stateDisconnected
+					systray.SetTemplateIcon(icons.MainIconData, icons.MainIconData)
+					systray.SetTooltip(TooltipMsgDisconnected)
+					continue
+				}
+				if state == stateDisconnected {
+					state = stateConnecting
+					systray.SetTooltip(TooltipMsgConnecting)
+					flip = 0
+				}
+				if state == stateConnected {
+					systray.SetTemplateIcon(icons.MainIconConnected, icons.MainIconConnected)
+					systray.SetTooltip(TooltipMsgConnected)
+					continue
+				}
+				systray.SetTemplateIcon(animIcons[flip], animIcons[flip])
+				flip = (flip + 1) % 2
+				break
+			}
+		}
+	}()
+
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Printf("PANIC: %v\n", err)
+				debug.PrintStack()
+			}
+		}()
+
+		var pubAddress = ""
 
 	CHECKLOOP:
 		for {
@@ -264,16 +304,8 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 
 			case <-time.After(10 * time.Second):
 				if !clientActive && !serverActive {
-					state = stateDisconnected
 					pubAddress = ""
-					systray.SetTemplateIcon(icons.MainIconData, icons.MainIconData)
-					systray.SetTooltip(TooltipMsgDisconnected)
 					continue
-				}
-				if state == stateDisconnected {
-					state = stateConnecting
-					systray.SetTooltip(TooltipMsgConnecting)
-					flip = 0
 				}
 
 				// Inverse of what one might expect
@@ -289,9 +321,6 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				if state != stateConnected {
 					var resp = api.RequestEcho(listenHost, gatewayHost, gatewayAPIPort, clientToServer)
 					if resp == nil {
-						systray.SetTemplateIcon(animIcons[flip], animIcons[flip])
-						flip = (flip + 1) % 2
-
 						// check in tray-icon for activated proxy
 						shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
 						if shared.UsingProxy {
@@ -316,15 +345,11 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 					if status == nil || status.ConnectionCounter < 0 {
 						pubAddress = ""
 						state = stateConnecting
-						systray.SetTemplateIcon(animIcons[flip], animIcons[flip])
-						flip = (flip + 1) % 2
 						continue
 					}
 
 					log.Printf("Server Status: %s %d\n", status.LastCheck, status.ConnectionCounter)
 					state = stateConnected
-					systray.SetTemplateIcon(icons.MainIconConnected, icons.MainIconConnected)
-					systray.SetTooltip(TooltipMsgConnected)
 				}
 				continue
 			}
