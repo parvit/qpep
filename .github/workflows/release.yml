@@ -126,7 +126,8 @@ jobs:
 
     - name: Update version resource
       run: |
-           go generate github.com/parvit/qpep/version
+          go install github.com/josephspurrier/goversioninfo
+          go generate github.com/parvit/qpep/version
 
     - name: Build QPep x64
       run: |
