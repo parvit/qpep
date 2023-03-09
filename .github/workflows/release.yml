@@ -123,7 +123,11 @@ jobs:
            set GOARCH=386
            go clean -cache
            COPY /Y windivert\x64\* build\64bits
-           
+
+    - name: Update version resource
+      run: |
+           go generate github.com/parvit/qpep/version
+
     - name: Build QPep x64
       run: |
            set GOARCH=amd64
