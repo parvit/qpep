@@ -124,11 +124,12 @@ jobs:
            go clean -cache
            COPY /Y windivert\x64\* build\64bits
 
-#    - name: Update version resource
-#      run: |
-#          go install github.com/josephspurrier/goversioninfo
-#          go generate github.com/parvit/qpep/version
-#
+    - name: Update version resource
+      run: |
+          git clone https://github.com/josephspurrier/goversioninfo
+          cd goversioninfo && go build -o /usr/local/bin/goversioninfo
+          go generate github.com/parvit/qpep/version
+
     - name: Build QPep x64
       run: |
            set GOARCH=amd64
