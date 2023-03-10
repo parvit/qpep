@@ -284,6 +284,9 @@ func (s *statistics) SetMappedAddress(source string, dest string) {
 	srcKey := "src-" + source
 	if _, ok := s.state[srcKey]; !ok {
 		key := "host-" + dest
+		s.semCounters.Lock()
+		defer s.semCounters.Unlock()
+
 		if _, found := s.counters[key]; !found {
 			s.hosts = append(s.hosts, dest)
 			s.counters[key] = 1

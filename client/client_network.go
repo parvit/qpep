@@ -3,9 +3,11 @@ package client
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/parvit/qpep/logger"
 	"io/ioutil"
 	"net/http"
+	"runtime/trace"
 
 	"crypto/tls"
 	"io"
@@ -173,7 +175,7 @@ func getQuicStream() (quic.Stream, error) {
 // standard method to open the proxy connection correctly via the quic stream
 func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stream quic.Stream) error {
 	// proxy check
-	_ = tcpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	_ = tcpConn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
 
 	buf := bytes.NewBuffer(make([]byte, 0, INITIAL_BUFF_SIZE))
 	n, err := io.Copy(buf, tcpConn)
@@ -304,9 +306,12 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 
 // handleTcpToQuic method implements the tcp connection to quic connection side of the connection
 func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.Stream, src net.Conn) {
+	tskKey := fmt.Sprintf("Tcp->Quic:%v", dst.StreamID())
+	_, tsk := trace.NewTask(context.Background(), tskKey)
 	defer func() {
 		_ = recover()
 
+		tsk.End()
 		streamWait.Done()
 	}()
 
@@ -327,7 +332,10 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
+		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
 		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+		tsk.End()
+
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
 				continue
@@ -340,9 +348,12 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 // handleQuicToTcp method implements the quic connection to tcp connection side of the connection
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Conn, src quic.Stream) {
+	tskKey := fmt.Sprintf("Quic->Tcp:%v", src.StreamID())
+	_, tsk := trace.NewTask(context.Background(), tskKey)
 	defer func() {
 		_ = recover()
 
+		tsk.End()
 		streamWait.Done()
 	}()
 
@@ -364,8 +375,10 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
+		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
 		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
 		logger.Debug("q -> t: %d", written)
+		tsk.End()
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
@@ -430,7 +443,10 @@ func openQuicSession() (quic.Connection, error) {
 
 	logger.Info("Dialing QUIC Session: %s\n", gatewayPath)
 	for i := 0; i < ClientConfiguration.MaxConnectionRetries; i++ {
+		_, tsk := trace.NewTask(context.Background(), fmt.Sprintf("DialQuic-"+gatewayPath+"-%d", i))
 		session, err = quic.DialAddr(gatewayPath, tlsConf, quicClientConfig)
+		tsk.End()
+
 		if err == nil {
 			logger.Info("QUIC Session Open\n")
 			return session, nil

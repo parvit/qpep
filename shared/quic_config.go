@@ -10,10 +10,10 @@ import (
 // quic-go library, it is common among the server and client packages
 func GetQuicConfiguration() *quic.Config {
 	cfg := &quic.Config{
-		MaxIncomingStreams:      40000,
-		DisablePathMTUDiscovery: true,
+		MaxIncomingStreams:      1024,
+		DisablePathMTUDiscovery: false,
 
-		HandshakeIdleTimeout: 5 * time.Second,
+		HandshakeIdleTimeout: 100 * time.Millisecond,
 	}
 
 	// Only used in debug sessions
