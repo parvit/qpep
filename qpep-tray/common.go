@@ -3,14 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"path/filepath"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/getlantern/systray"
 	"github.com/parvit/qpep/api"
+	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/qpep-tray/icons"
+	"github.com/parvit/qpep/qpep-tray/toast"
 	"github.com/parvit/qpep/shared"
+	"github.com/parvit/qpep/version"
 
 	. "github.com/sqweek/dialog"
 )
@@ -21,15 +27,44 @@ const (
 	TooltipMsgConnected    = "QPep TCP accelerator - Status: Connected"
 )
 
+var (
+	ExeDir       = ""
+	MainIconData = ""
+)
+
+func NotifyUser(message, category string, longNotification bool) {
+	if len(MainIconData) == 0 {
+		MainIconData = filepath.Join(ExeDir, "main.png")
+		// extract the icon for notifications
+		if err := ioutil.WriteFile(MainIconData, icons.MainIconConnected, 0666); err != nil {
+			NotifyUser("Could not extract notification icon", "Error", false)
+		}
+	}
+	var duration = toast.Short
+	if longNotification {
+		duration = toast.Long
+	}
+	n := toast.Notification{
+		AppID:    "QPep",
+		Title:    category,
+		Message:  message,
+		Duration: duration,
+		Icon:     MainIconData,
+	}
+	if err := n.Push(); err != nil {
+		log.Println("ERR: ", err)
+	}
+}
+
 func ErrorMsg(message string, parameters ...interface{}) {
 	str := fmt.Sprintf(message, parameters...)
 	log.Println("ERR: ", str)
-	Message(str).Error()
+
+	NotifyUser(message, "Error", false)
 }
 func InfoMsg(message string, parameters ...interface{}) {
 	str := fmt.Sprintf(message, parameters...)
 	log.Println("INFO: ", str)
-	Message(str).Info()
 }
 func ConfirmMsg(message string, parameters ...interface{}) bool {
 	str := fmt.Sprintf(message, parameters...)
@@ -45,12 +80,17 @@ var cancelConnectionWatchdog context.CancelFunc
 
 var addressCheckBoxList []*systray.MenuItem
 
+var mClient *systray.MenuItem
+var mServer *systray.MenuItem
+
 func onReady() {
 	// Setup tray menu
 	systray.SetTemplateIcon(icons.MainIconData, icons.MainIconData)
-	systray.SetTitle("QPep TCP accelerator")
-	systray.SetTooltip("QPep TCP accelerator")
+	systray.SetTitle("QPep Connection Accelerator")
+	systray.SetTooltip("QPep Connection Accelerator")
 
+	mInfo := systray.AddMenuItem("About", "About the project")
+	systray.AddSeparator()
 	mStatus := systray.AddMenuItem("Status Interface", "Open the status web gui")
 	mConfig := systray.AddMenuItem("Edit Configuration", "Open configuration for next client / server executions")
 	mConfigRefresh := systray.AddMenuItem("Reload Configuration", "Reload configuration from disk and restart the service")
@@ -62,12 +102,13 @@ func onReady() {
 		addressCheckBoxList = append(addressCheckBoxList, box)
 	}
 	systray.AddSeparator()
-	mClient := systray.AddMenuItemCheckbox("Activate Client", "Launch/Stop QPep Client", false)
-	mServer := systray.AddMenuItemCheckbox("Activate Server", "Launch/Stop QPep Server", false)
+	mClient = systray.AddMenuItemCheckbox("Activate Client", "Launch/Stop QPep Client", false)
+	mServer = systray.AddMenuItemCheckbox("Activate Server", "Launch/Stop QPep Server", false)
 	systray.AddSeparator()
 	mQuit := systray.AddMenuItem("Quit", "Stop all and quit the whole app")
 
 	// Sets the icon of the menu items
+	mInfo.SetIcon(icons.MainIconConnected)
 	mQuit.SetIcon(icons.ExitIconData)
 	mStatus.SetIcon(icons.ConfigIconData)
 	mConfig.SetIcon(icons.ConfigIconData)
@@ -102,11 +143,13 @@ func onReady() {
 							}
 							checkbox.Uncheck()
 						}
-						InfoMsg("Listening address will be forced to %s", addressList[index])
+						InfoMsg(fmt.Sprintf("Listening address will be forced to %s", addressList[index]))
 					}
 				}
 			}(box, idx)
 		}
+
+		NotifyUser("Ready", "Info", false)
 
 		for {
 			select {
@@ -118,16 +161,19 @@ func onReady() {
 				openWebguiWithOSBrowser(mClientActive, mServerActive)
 				continue
 
+			case <-mInfo.ClickedCh:
+				NotifyUser(version.Version(), "Version", true)
+				continue
+
 			case <-mConfigRefresh.ClickedCh:
 				shared.ReadConfiguration(true)
+				NotifyUser("Reload finished", "Info", false)
 				continue
 
 			case <-mClient.ClickedCh:
 				if !mClientActive {
-					if ok := ConfirmMsg("Do you want to enable the client?"); !ok {
-						break
-					}
 					if startClient() == nil {
+						NotifyUser("Start Client", "Info", false)
 						mClientActive = true
 						mClient.SetTitle("Stop Client")
 						mClient.Enable()
@@ -141,10 +187,8 @@ func onReady() {
 					}
 
 				} else {
-					if ok := ConfirmMsg("Do you want to disable the client?"); !ok {
-						break
-					}
 					if stopClient() == nil {
+						NotifyUser("Stop Client", "Info", false)
 						mClientActive = false
 						mClient.SetTitle("Activate Client")
 						mClient.Enable()
@@ -160,9 +204,7 @@ func onReady() {
 
 			case <-mServer.ClickedCh:
 				if !mServerActive {
-					if ok := ConfirmMsg("Do you want to enable the server?"); !ok {
-						break
-					}
+					NotifyUser("Start Server", "Info", false)
 					mServerActive = true
 					mServer.SetTitle("Stop Server")
 					mServer.Enable()
@@ -175,9 +217,7 @@ func onReady() {
 					mClient.Disable()
 					stopClient()
 				} else {
-					if ok := ConfirmMsg("Do you want to enable the server?"); !ok {
-						break
-					}
+					NotifyUser("Stop Server", "Info", false)
 					mServerActive = false
 					mServer.SetTitle("Activate Server")
 					mServer.Enable()
@@ -227,7 +267,7 @@ func onExit() {
 		break
 	}
 
-	log.Println("Closing...")
+	NotifyUser("Closed", "Info", false)
 }
 
 func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
@@ -263,15 +303,19 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 
 			case <-time.After(1 * time.Second):
 				if !clientActive && !serverActive {
-					state = stateDisconnected
 					systray.SetTemplateIcon(icons.MainIconData, icons.MainIconData)
 					systray.SetTooltip(TooltipMsgDisconnected)
+					if state != stateDisconnected {
+						NotifyUser("Disconnected", "Info", false)
+					}
+					state = stateDisconnected
 					continue
 				}
 				if state == stateDisconnected {
 					state = stateConnecting
 					systray.SetTooltip(TooltipMsgConnecting)
 					flip = 0
+					NotifyUser("Initiating connection...", "Info", false)
 				}
 				if state == stateConnected {
 					systray.SetTemplateIcon(icons.MainIconConnected, icons.MainIconConnected)
@@ -318,15 +362,25 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 				gatewayHost := shared.QPepConfig.GatewayHost
 				gatewayAPIPort := shared.QPepConfig.GatewayAPIPort
 
+				shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
+				if shared.UsingProxy {
+					shared.QPepConfig.ListenHost = shared.ProxyAddress.Hostname()
+				}
+				log.Printf("Proxy: %v %v\n", shared.UsingProxy, shared.ProxyAddress)
+
+				if !fakeAPICallCheckProxy() {
+					NotifyUser("Detected issue with setting the proxy values, terminating...", "Error", false)
+					state = stateDisconnected
+					if clientActive {
+						mClient.ClickedCh <- struct{}{}
+						continue
+					}
+				}
+
 				if state != stateConnected {
 					var resp = api.RequestEcho(listenHost, gatewayHost, gatewayAPIPort, clientToServer)
 					if resp == nil {
 						// check in tray-icon for activated proxy
-						shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
-						if shared.UsingProxy {
-							shared.QPepConfig.ListenHost = shared.ProxyAddress.Hostname()
-						}
-						log.Printf("Proxy: %v %v\n", shared.UsingProxy, shared.ProxyAddress)
 						log.Printf("Server Echo: FAILED\n")
 						continue
 					}
@@ -349,6 +403,7 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 					}
 
 					log.Printf("Server Status: %s %d\n", status.LastCheck, status.ConnectionCounter)
+					NotifyUser("Connection established", "Info", false)
 					state = stateConnected
 				}
 				continue
@@ -357,4 +412,23 @@ func startConnectionStatusWatchdog() (context.Context, context.CancelFunc) {
 	}()
 
 	return ctx, cancel
+}
+
+// fakeAPICallCheckProxy executes a "fake" api call to the local server to check for the connection running through
+// the global proxy, this is checked by the client that adds the "X-QPEP-PROXY" header with value "true", a missing or
+// "false" value means the proxy is not running correctly
+func fakeAPICallCheckProxy() bool {
+	data, err, _ := shared.RunCommand("powershell.exe", "-ExecutionPolicy", "ByPass", "-Command",
+		"Invoke-WebRequest -Uri \"http://192.168.1.40:444/qpep-client-proxy-check\" -UseBasicParsing -TimeoutSec 1",
+	)
+	logger.Info("proxy check data: %s", data)
+	logger.Info("proxy check error: %v", err)
+	if err != nil {
+		return false
+	}
+	if strings.Contains(string(data), "X-QPEP-PROXY, true") {
+		logger.Info("proxy is working")
+		return true
+	}
+	return false
 }

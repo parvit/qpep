@@ -669,17 +669,22 @@ func (s *ServerSuite) TestRunServer_APIConnection_LimitDst() {
 
 	stream.Write(sendData)
 
+	var sendEnd time.Time
 	total := 0
 	scn := bufio.NewScanner(stream)
 	for scn.Scan() {
-		total += len(scn.Text())
+		total += len(scn.Bytes())
+		logger.Info("total: %d / %d / %d - %v", total, expectSent, (1024+1)*1024, time.Now().Sub(startSend))
+
+		if total > expectSent {
+			sendEnd = time.Now()
+
+			stream.CancelRead(0)
+			stream.CancelWrite(0)
+			stream.Close()
+			break
+		}
 	}
-
-	var sendEnd = time.Now()
-
-	stream.CancelWrite(0)
-	stream.CancelRead(0)
-	stream.Close()
 
 	cancel()
 

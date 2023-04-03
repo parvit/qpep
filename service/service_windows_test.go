@@ -72,13 +72,13 @@ func (s *ServiceWinSuite) TestSetCurrentWorkingDir_FailPathNotExist() {
 }
 
 func (s *ServiceWinSuite) TestSetServiceUserPermissions() {
-	monkey.Patch(shared.RunCommand, func(name string, params ...string) ([]byte, error) {
+	monkey.Patch(shared.RunCommand, func(name string, params ...string) ([]byte, error, int) {
 		assert.Equal(s.T(), "sc.exe", name)
 		assert.Len(s.T(), params, 3)
 		assert.Equal(s.T(), "sdset", params[0])
 		assert.Equal(s.T(), "test-service", params[1])
 		assert.Equal(s.T(), USER_ACCESS_LIST, params[2])
-		return nil, nil
+		return nil, nil, 0
 	})
 
 	assert.NotPanics(s.T(), func() {
@@ -87,8 +87,8 @@ func (s *ServiceWinSuite) TestSetServiceUserPermissions() {
 }
 
 func (s *ServiceWinSuite) TestSetServiceUserPermissions_Error() {
-	monkey.Patch(shared.RunCommand, func(string, ...string) ([]byte, error) {
-		return nil, errors.New("test-error")
+	monkey.Patch(shared.RunCommand, func(string, ...string) ([]byte, error, int) {
+		return nil, errors.New("test-error"), 1
 	})
 
 	assert.NotPanics(s.T(), func() {
@@ -97,7 +97,7 @@ func (s *ServiceWinSuite) TestSetServiceUserPermissions_Error() {
 }
 
 func (s *ServiceWinSuite) TestInstallDirectoryPermissions() {
-	monkey.Patch(shared.RunCommand, func(name string, params ...string) ([]byte, error) {
+	monkey.Patch(shared.RunCommand, func(name string, params ...string) ([]byte, error, int) {
 		assert.Equal(s.T(), "icacls", name)
 		switch len(params) {
 		case 5:
@@ -115,9 +115,9 @@ func (s *ServiceWinSuite) TestInstallDirectoryPermissions() {
 			break
 		default:
 			assert.Failf(s.T(), "Number of parameters unexpected", "%d", len(params))
-			return nil, errors.New("")
+			return nil, errors.New(""), 1
 		}
-		return nil, nil
+		return nil, nil, 0
 	})
 
 	assert.NotPanics(s.T(), func() {
@@ -126,8 +126,8 @@ func (s *ServiceWinSuite) TestInstallDirectoryPermissions() {
 }
 
 func (s *ServiceWinSuite) TestInstallDirectoryPermissions_ErrorFirstCmd() {
-	monkey.Patch(shared.RunCommand, func(string, ...string) ([]byte, error) {
-		return nil, errors.New("test-error")
+	monkey.Patch(shared.RunCommand, func(string, ...string) ([]byte, error, int) {
+		return nil, errors.New("test-error"), 1
 	})
 
 	assert.Panics(s.T(), func() {
@@ -136,11 +136,11 @@ func (s *ServiceWinSuite) TestInstallDirectoryPermissions_ErrorFirstCmd() {
 }
 
 func (s *ServiceWinSuite) TestInstallDirectoryPermissions_ErrorSecondCmd() {
-	monkey.Patch(shared.RunCommand, func(_ string, params ...string) ([]byte, error) {
+	monkey.Patch(shared.RunCommand, func(_ string, params ...string) ([]byte, error, int) {
 		if params[len(params)-1] == "/reset" {
-			return nil, nil
+			return nil, nil, 0
 		}
-		return nil, errors.New("test-error")
+		return nil, errors.New("test-error"), 1
 	})
 
 	assert.Panics(s.T(), func() {

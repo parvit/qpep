@@ -72,6 +72,46 @@ func (s *ParamsValidationSuite) TestParamsValidation_Port() {
 	})
 }
 
+func (s *ParamsValidationSuite) TestParamsValidation_String() {
+	t := s.T()
+	assert.NotPanics(t, func() {
+		AssertParamString("test", " value ")
+	})
+
+	assert.Panics(t, func() {
+		AssertParamString("test", "  ")
+	}, ErrConfigurationValidationFailed)
+
+	assert.Panics(t, func() {
+		AssertParamString("test", "")
+	}, ErrConfigurationValidationFailed)
+}
+
+func (s *ParamsValidationSuite) TestParamsValidation_Choice() {
+	t := s.T()
+	assert.NotPanics(t, func() {
+		AssertParamChoice("test", "value", []string{"v1", "value", "v2"})
+	})
+	assert.NotPanics(t, func() {
+		AssertParamChoice("test", "value", []string{"v1", "value"})
+	})
+	assert.NotPanics(t, func() {
+		AssertParamChoice("test", "value", []string{"value"})
+	})
+
+	assert.Panics(t, func() {
+		AssertParamChoice("test", "not-value", []string{"v1", "value"})
+	}, ErrConfigurationValidationFailed)
+
+	assert.Panics(t, func() {
+		AssertParamChoice("test", "", []string{"v1", "value"})
+	}, ErrConfigurationValidationFailed)
+
+	assert.Panics(t, func() {
+		AssertParamChoice("test", "v2", []string{})
+	}, ErrImpossibleValidationRequested)
+}
+
 func (s *ParamsValidationSuite) TestParamsValidation_PortsDifferent_Valid() {
 	t := s.T()
 	assert.NotPanics(t, func() {

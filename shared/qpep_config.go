@@ -89,6 +89,9 @@ type QPepConfigType struct {
 	// Limits (yaml:limits) Declares the incoming and outgoing speed limits for clients and destination addresses
 	Limits LimitsDefinition `yaml:"limits"`
 
+	// Analytics (yaml:analytics) Declares the configuration for server-side analytics collectìon, ignored for client, default disabled
+	Analytics AnalyticsDefinition `yaml:"analytics"`
+
 	// -- Unused values -- //
 
 	// Acks unused currently
@@ -121,6 +124,21 @@ type LimitsDefinition struct {
 	Clients map[string]string `yaml:"clients"`
 	// Destinations (yaml:destinations) key defines the speed limits for outgoing connections
 	Destinations map[string]string `yaml:"destinations"`
+}
+
+// AnalyticsDefinition struct models the configuration values for the analytics client, by default it
+// remains disabled
+type AnalyticsDefinition struct {
+	// Enabled (yaml:enabled) allows to quickly enable or disable the analytics configuration
+	Enabled bool `yaml:"enabled"`
+	// BrokerAddress (yaml:address) Address of broker instance
+	BrokerAddress string `yaml:"address"`
+	// BrokerPort (yaml:port) Port of broker instance
+	BrokerPort int `yaml:"port"`
+	// BrokerProtocol (yaml:protocol) Protocol for broker connection
+	BrokerProtocol string `yaml:"protocol"`
+	// BrokerTopic (yaml:topic) Topic on which to publish the data
+	BrokerTopic string `yaml:"topic"`
 }
 
 // rawConfigType struct that allows to decode and overwrite the main configuration

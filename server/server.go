@@ -40,6 +40,8 @@ type ServerConfig struct {
 	ListenPort int
 	// APIPort port [1-65535] on which the API server is launched
 	APIPort int
+
+	BrokerConfig shared.AnalyticsDefinition
 }
 
 // RunServer method validates the provided server configuration and then launches the server
@@ -58,6 +60,11 @@ func RunServer(ctx context.Context, cancel context.CancelFunc) {
 
 	// update configuration from flags
 	validateConfiguration()
+
+	if ServerConfiguration.BrokerConfig.Enabled {
+		api.Statistics.Start(&ServerConfiguration.BrokerConfig)
+	}
+	defer api.Statistics.Stop()
 
 	listenAddr := ServerConfiguration.ListenHost + ":" + strconv.Itoa(ServerConfiguration.ListenPort)
 	logger.Info("Opening QPEP Server on: %s\n", listenAddr)
@@ -164,6 +171,22 @@ func validateConfiguration() {
 	shared.AssertParamPort("api port", ServerConfiguration.APIPort)
 
 	shared.AssertParamPortsDifferent("ports", ServerConfiguration.ListenPort, ServerConfiguration.APIPort)
+
+	brokerConfig := shared.QPepConfig.Analytics
+	if !brokerConfig.Enabled {
+		ServerConfiguration.BrokerConfig.Enabled = false
+	} else {
+		shared.AssertParamIP("broker address", brokerConfig.BrokerAddress)
+		shared.AssertParamPort("broker port", brokerConfig.BrokerPort)
+		shared.AssertParamString("broker topic", brokerConfig.BrokerTopic)
+		shared.AssertParamChoice("broker protocol", brokerConfig.BrokerProtocol, []string{"tcp", "udp"})
+
+		ServerConfiguration.BrokerConfig.Enabled = true
+		ServerConfiguration.BrokerConfig.BrokerAddress = brokerConfig.BrokerAddress
+		ServerConfiguration.BrokerConfig.BrokerPort = brokerConfig.BrokerPort
+		ServerConfiguration.BrokerConfig.BrokerProtocol = brokerConfig.BrokerProtocol
+		ServerConfiguration.BrokerConfig.BrokerTopic = brokerConfig.BrokerTopic
+	}
 
 	logger.Info("Server configuration validation OK\n")
 }

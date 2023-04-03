@@ -73,9 +73,6 @@ func startReloadConfigurationWatchdog() (context.Context, context.CancelFunc) {
 					continue
 				}
 				lastModTime = stat.ModTime()
-				if ok := ConfirmMsg("Do you want to reload the configuration?"); !ok {
-					continue
-				}
 				if shared.ReadConfiguration(true) == nil {
 					reloadClientIfRunning()
 					reloadServerIfRunning()

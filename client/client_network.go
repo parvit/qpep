@@ -25,15 +25,15 @@ import (
 	"golang.org/x/net/context"
 )
 
+const (
+	BUFFER_SIZE = 512 * 1024
+)
+
 var (
 	// proxyListener listener for the local http connections that get diverted or proxied to the quic server
 	proxyListener net.Listener
 	// quicSession listening quic connection to the server
 	quicSession quic.Connection
-)
-
-const (
-	BUFFER_SIZE = 512 * 1024
 )
 
 // listenTCPConn method implements the routine that listens to incoming diverted/proxied connections
@@ -64,8 +64,23 @@ func handleTCPConn(tcpConn net.Conn) {
 			debug.PrintStack()
 		}
 	}()
-	logger.Info("Accepting TCP connection from %s with destination of %s", tcpConn.RemoteAddr().String(), tcpConn.LocalAddr().String())
+	logger.Info("Accepting TCP connection: source:%s destination:%s", tcpConn.LocalAddr().String(), tcpConn.RemoteAddr().String())
 	defer tcpConn.Close()
+
+	tcpSourceAddr := tcpConn.RemoteAddr().(*net.TCPAddr)
+	diverted, srcPort, dstPort, srcAddress, dstAddress := windivert.GetConnectionStateData(tcpSourceAddr.Port)
+
+	var proxyRequest *http.Request
+	var errProxy error
+	if diverted != windivert.DIVERT_OK {
+		// proxy open connection
+		proxyRequest, errProxy = handleProxyOpenConnection(tcpConn)
+		if errProxy == shared.ErrProxyCheckRequest {
+			logger.Info("Checked for proxy usage, closing.")
+			return
+		}
+		logger.OnError(errProxy, "opening proxy connection")
+	}
 
 	var quicStream, err = getQuicStream()
 	if err != nil {
@@ -80,12 +95,11 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	//Set our custom header to the QUIC session so the server can generate the correct TCP handshake on the other side
 	sessionHeader := shared.QPepHeader{
-		SourceAddr: tcpConn.RemoteAddr().(*net.TCPAddr),
+		SourceAddr: tcpSourceAddr,
 		DestAddr:   tcpConn.LocalAddr().(*net.TCPAddr),
 	}
 
 	// divert check
-	diverted, srcPort, dstPort, srcAddress, dstAddress := windivert.GetConnectionStateData(sessionHeader.SourceAddr.Port)
 	if diverted == windivert.DIVERT_OK {
 		logger.Info("Diverted connection: %v:%v %v:%v", srcAddress, srcPort, dstAddress, dstPort)
 
@@ -102,9 +116,10 @@ func handleTCPConn(tcpConn net.Conn) {
 		_, err := quicStream.Write(sessionHeader.ToBytes())
 		logger.OnError(err, "writing to quic stream")
 	} else {
-		// proxy open connection
-		err := handleProxyOpenConnection(&sessionHeader, tcpConn, quicStream)
-		logger.OnError(err, "opening proxy connection")
+		if proxyRequest != nil {
+			err = handleProxyedRequest(proxyRequest, &sessionHeader, tcpConn, quicStream)
+			logger.OnError(err, "handling of proxy proxyRequest")
+		}
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -114,7 +129,7 @@ func handleTCPConn(tcpConn net.Conn) {
 	go handleTcpToQuic(ctx, &streamWait, quicStream, tcpConn)
 	go handleQuicToTcp(ctx, &streamWait, tcpConn, quicStream)
 	go func() {
-		<-time.After(5 * time.Second)
+		<-time.After(shared.GetScaledTimeout(10, time.Second))
 		cancel()
 	}()
 
@@ -173,22 +188,22 @@ func getQuicStream() (quic.Stream, error) {
 
 // handleProxyOpenConnection method wraps the logic for intercepting an http request with CONNECT or
 // standard method to open the proxy connection correctly via the quic stream
-func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stream quic.Stream) error {
+func handleProxyOpenConnection(tcpConn net.Conn) (*http.Request, error) {
 	// proxy check
-	_ = tcpConn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
+	_ = tcpConn.SetReadDeadline(time.Now().Add(10 * time.Millisecond)) // not scaled as proxy connection is always local
 
 	buf := bytes.NewBuffer(make([]byte, 0, INITIAL_BUFF_SIZE))
 	n, err := io.Copy(buf, tcpConn)
 	if n == 0 {
 		logger.Error("Failed to receive request: %v\n", err)
-		return shared.ErrNonProxyableRequest
+		return nil, shared.ErrNonProxyableRequest
 	}
 	if err != nil {
 		nErr, ok := err.(net.Error)
 		if !ok || (ok && (!nErr.Timeout() && !nErr.Temporary())) {
 			_ = tcpConn.Close()
 			logger.Error("Failed to receive request: %v\n", err)
-			return shared.ErrNonProxyableRequest
+			return nil, shared.ErrNonProxyableRequest
 		}
 	}
 
@@ -197,9 +212,81 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	if err != nil {
 		_ = tcpConn.Close()
 		logger.Error("Failed to parse request: %v\n", err)
-		return shared.ErrNonProxyableRequest
+		return nil, shared.ErrNonProxyableRequest
 	}
 
+	if checkProxyTestConnection(req.RequestURI) {
+		var isProxyWorking = false
+		if shared.UsingProxy && shared.ProxyAddress.String() == "http://"+tcpConn.LocalAddr().String() {
+			isProxyWorking = true
+		}
+
+		t := http.Response{
+			Status:        http.StatusText(http.StatusOK),
+			StatusCode:    http.StatusOK,
+			Proto:         req.Proto,
+			ProtoMajor:    req.ProtoMajor,
+			ProtoMinor:    req.ProtoMinor,
+			Body:          ioutil.NopCloser(bytes.NewBufferString("")),
+			ContentLength: 0,
+			Request:       req,
+			Header: http.Header{
+				shared.QPEP_PROXY_HEADER: []string{fmt.Sprintf("%v", isProxyWorking)},
+			},
+		}
+
+		t.Write(tcpConn)
+		_ = tcpConn.Close()
+		return nil, shared.ErrProxyCheckRequest
+	}
+
+	switch req.Method {
+	case http.MethodDelete:
+		break
+	case http.MethodPost:
+		break
+	case http.MethodPut:
+		break
+	case http.MethodPatch:
+		break
+	case http.MethodHead:
+		break
+	case http.MethodOptions:
+		break
+	case http.MethodTrace:
+		break
+	case http.MethodConnect:
+		fallthrough
+	case http.MethodGet:
+		_, _, proxyable := getAddressPortFromHost(req.Host)
+		if !proxyable {
+			_ = tcpConn.Close()
+			logger.Info("Non proxyable request\n")
+			return nil, shared.ErrNonProxyableRequest
+		}
+		break
+	default:
+		t := http.Response{
+			Status:        http.StatusText(http.StatusBadGateway),
+			StatusCode:    http.StatusBadGateway,
+			Proto:         req.Proto,
+			ProtoMajor:    req.ProtoMajor,
+			ProtoMinor:    req.ProtoMinor,
+			Body:          ioutil.NopCloser(bytes.NewBufferString("")),
+			ContentLength: 0,
+			Request:       req,
+			Header:        make(http.Header, 0),
+		}
+
+		t.Write(tcpConn)
+		_ = tcpConn.Close()
+		logger.Error("Proxy returns BadGateway\n")
+		return nil, shared.ErrNonProxyableRequest
+	}
+	return req, nil
+}
+
+func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn net.Conn, stream quic.Stream) error {
 	switch req.Method {
 	case http.MethodDelete:
 		fallthrough
@@ -218,9 +305,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	case http.MethodGet:
 		address, port, proxyable := getAddressPortFromHost(req.Host)
 		if !proxyable {
-			_ = tcpConn.Close()
-			logger.Info("Non proxyable request\n")
-			return shared.ErrNonProxyableRequest
+			panic("Should not happen as the handleProxyOpenConnection method checks the http request")
 		}
 
 		header.DestAddr = &net.TCPAddr{
@@ -249,9 +334,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 	case http.MethodConnect:
 		address, port, proxyable := getAddressPortFromHost(req.Host)
 		if !proxyable {
-			_ = tcpConn.Close()
-			logger.Error("Non proxyable request\n")
-			return shared.ErrNonProxyableRequest
+			panic("Should not happen as the handleProxyOpenConnection method checks the http request")
 		}
 
 		header.DestAddr = &net.TCPAddr{
@@ -272,7 +355,6 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		}
 
 		t.Write(tcpConn)
-		buf.Reset()
 
 		logger.Info("Proxied connection")
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", header.SourceAddr, header.DestAddr)
@@ -284,22 +366,7 @@ func handleProxyOpenConnection(header *shared.QPepHeader, tcpConn net.Conn, stre
 		}
 		break
 	default:
-		t := http.Response{
-			Status:        http.StatusText(http.StatusBadGateway),
-			StatusCode:    http.StatusBadGateway,
-			Proto:         req.Proto,
-			ProtoMajor:    req.ProtoMajor,
-			ProtoMinor:    req.ProtoMinor,
-			Body:          ioutil.NopCloser(bytes.NewBufferString("")),
-			ContentLength: 0,
-			Request:       req,
-			Header:        make(http.Header, 0),
-		}
-
-		t.Write(tcpConn)
-		_ = tcpConn.Close()
-		logger.Error("Proxy returns BadGateway\n")
-		return shared.ErrNonProxyableRequest
+		panic("Should not happen as the handleProxyOpenConnection method checks the http request method")
 	}
 	return nil
 }
@@ -317,7 +384,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 	setLinger(src)
 
-	var loopTimeout = 1 * time.Second
+	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
 	var tempBuffer = make([]byte, BUFFER_SIZE)
 	for {
 		select {
@@ -359,7 +426,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 
 	setLinger(dst)
 
-	var loopTimeout = 1 * time.Second
+	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
 	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
@@ -395,6 +462,10 @@ func setLinger(c net.Conn) {
 		err1 := conn.SetLinger(1)
 		logger.OnError(err1, "error on setLinger")
 	}
+}
+
+func checkProxyTestConnection(host string) bool {
+	return strings.Contains(host, "qpep-client-proxy-check")
 }
 
 // getAddressPortFromHost method returns an address splitted in the corresponding IP, port and if the indicated

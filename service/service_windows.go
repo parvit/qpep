@@ -44,7 +44,7 @@ func setServiceUserPermissions(serviceName string) {
 	logger.Info("Set user permissions %s", serviceName)
 	logger.Debug(`acl: "%s"`, USER_ACCESS_LIST)
 
-	_, err := shared.RunCommand(`sc.exe`, `sdset`, serviceName, USER_ACCESS_LIST)
+	_, err, _ := shared.RunCommand(`sc.exe`, `sdset`, serviceName, USER_ACCESS_LIST)
 	if err != nil {
 		logger.Error("%v", err)
 		return
@@ -59,13 +59,13 @@ func setInstallDirectoryPermissions(workDir string) {
 	logger.Info("Set install permissions %s", installDir)
 
 	// reset access permission on the installation directory to allow writing logs
-	_, err := shared.RunCommand(`icacls`, installDir, `/t`, `/q`, `/c`, `/reset`)
+	_, err, _ := shared.RunCommand(`icacls`, installDir, `/t`, `/q`, `/c`, `/reset`)
 	if err != nil {
 		logger.Panic("%v", err)
 	}
 
 	// allow Everyone group to access installation directory to allow writing logs
-	_, err = shared.RunCommand(`icacls`, installDir, `/t`, `/grant`, `Everyone:F`)
+	_, err, _ = shared.RunCommand(`icacls`, installDir, `/t`, `/grant`, `Everyone:F`)
 	if err != nil {
 		logger.Panic("%v", err)
 	}

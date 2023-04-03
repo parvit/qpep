@@ -14,4 +14,5 @@ var (
 	ErrInvalidHeaderAddressType      = errors.New("qpep header cannot be decoded because it has wrong ip version")
 	ErrInvalidHeaderDataLength       = errors.New("qpep header invalid because the data length is not coherent")
 	ErrNonProxyableRequest           = errors.New("qpep cannot handle the proxy request")
+	ErrProxyCheckRequest             = errors.New("qpep used a fake api request to check the proxy usage")
 )

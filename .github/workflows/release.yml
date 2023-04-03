@@ -12,6 +12,10 @@ on:
             description: 'Create x86 version'
             type: boolean
             default: false
+      do_tests:
+        description: 'Execute tests'
+        type: boolean
+        default: true
       version_tag:
             description: 'Version tag'
             type: 'string'
@@ -58,14 +62,15 @@ jobs:
     - name: Prepare
       run: mkdir build
         
-#    - name: Test
-#      run: |
-#        set GOARCH=amd64
-#        set GOOS=linux
-#        set CGO_ENABLED=0
-#        go test -v ./...
-#      continue-on-error: true
-#
+    - if: ${{ github.event.inputs.do_tests == true }}
+      name: Test
+      run: |
+        set GOARCH=amd64
+        set GOOS=linux
+        set CGO_ENABLED=0
+        go test -v ./...
+      continue-on-error: true
+
     - name: Build x64
       run: |
         set GOARCH=amd64
@@ -93,14 +98,15 @@ jobs:
       with:
         go-version: 1.18
         
-#    - name: Test
-#      run: |
-#        set GOARCH=amd64
-#        set GOOS=windows
-#        set CGO_ENABLED=1
-#        go test -v ./...
-#      continue-on-error: true
-#
+    - if: ${{ github.event.inputs.do_tests == true }}
+      name: Test
+      run: |
+        set GOARCH=amd64
+        set GOOS=windows
+        set CGO_ENABLED=1
+        go test -v ./...
+      continue-on-error: true
+
     - uses: actions/checkout@v2
     - name: Install Wix
       uses: actions/checkout@v2
@@ -171,6 +177,9 @@ jobs:
       
     - name: Build QPep Installer
       run: |
+           sed -E 's/Version="[^"]+"/Version="1.${{ github.event.inputs.version_tag }}"/' installer/installer.wxs > installer/installer.wxs
+           sed -E 's/FileVersion:\s*"[^"]+"/FileVersion:\s*"v0.${{ github.event.inputs.version_tag }}"/' version/versioninfo.json > version/versioninfo.json
+           sed -E 's/ProductVersion:\s*"[^"]+"/ProductVersion:\s*"v${{ github.event.inputs.version_tag }}"/' version/versioninfo.json > version/versioninfo.json
            set PATH=${{ github.workspace }}\wix\tools;%PATH%
            msbuild installer\installer.sln
    

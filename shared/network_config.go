@@ -4,6 +4,7 @@ import (
 	"github.com/jackpal/gateway"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/parvit/qpep/logger"
 )
@@ -20,6 +21,14 @@ var (
 	detectedGatewayInterfaces []int64
 	// detectedGatewayAddresses is the list of automatically detected addresses available in the system (one per network device)
 	detectedGatewayAddresses []string
+
+	// timeoutLatencyMultiplier multiples the various timeouts to try to adapt to progressively higher latencies
+	timeoutLatencyMultiplier int64 = 1
+)
+
+const (
+	MAX_TIMEOUT_MULTIPLER = 16
+	QPEP_PROXY_HEADER     = "X-QPEP-PROXY"
 )
 
 // init method executes the static initialization for detecting the current system's interfaces and addresses
@@ -102,4 +111,26 @@ func GetDefaultLanListeningAddress(currentAddress, gatewayAddress string) (strin
 // GetLanListeningAddresses returns all detected addresses and interfaces that can be used for listening
 func GetLanListeningAddresses() ([]string, []int64) {
 	return detectedGatewayAddresses, detectedGatewayInterfaces
+}
+
+func GetScaledTimeout(base int64, duration time.Duration) time.Duration {
+	return time.Duration(base*timeoutLatencyMultiplier) * duration
+}
+
+func ScaleUpTimeout() {
+	timeoutLatencyMultiplier *= 2
+	if timeoutLatencyMultiplier > MAX_TIMEOUT_MULTIPLER {
+		timeoutLatencyMultiplier = MAX_TIMEOUT_MULTIPLER
+	}
+
+	logger.Info("Timeout multiplier set to %d", timeoutLatencyMultiplier)
+}
+
+func ScaleDownTimeout() {
+	timeoutLatencyMultiplier /= 2
+	if timeoutLatencyMultiplier < 1 {
+		timeoutLatencyMultiplier = 1
+	}
+
+	logger.Info("Timeout multiplier set to %d", timeoutLatencyMultiplier)
 }

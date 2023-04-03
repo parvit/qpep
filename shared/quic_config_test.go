@@ -21,8 +21,8 @@ func (s *QuicConfigSuite) TestGetQuicConfiguration() {
 	cfg := GetQuicConfiguration()
 	assert.NotNil(s.T(), cfg)
 
-	assert.Equal(s.T(), int64(40000), cfg.MaxIncomingStreams)
-	assert.True(s.T(), cfg.DisablePathMTUDiscovery)
+	assert.Equal(s.T(), int64(1024), cfg.MaxIncomingStreams)
+	assert.False(s.T(), cfg.DisablePathMTUDiscovery)
 
 	assert.Nil(s.T(), cfg.Tracer)
 }

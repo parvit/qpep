@@ -1,6 +1,9 @@
 package api
 
-import "github.com/julienschmidt/httprouter"
+import (
+	"github.com/julienschmidt/httprouter"
+	"time"
+)
 
 // APIRouter struct that encapsulates the registered paths to be served
 type APIRouter struct {
@@ -54,6 +57,16 @@ type StatsInfo struct {
 type StatsInfoResponse struct {
 	// Data List of the collected statistics for a certain api client
 	Data []StatsInfo `json:"data"`
+}
+
+// StatsInfo models a single statistics info tracked by the server/client
+type AnalyticsEvent struct {
+	// ID Unique value key
+	ID string `json:"id"`
+	// Value string value of the info
+	Value float64 `json:"value"`
+	// Timestamp time at which the event was generated
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // --- Router --- //

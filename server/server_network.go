@@ -105,8 +105,8 @@ func handleQuicStream(stream quic.Stream) {
 	logger.Debug(">> Opening TCP Conn to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
 	dial := &net.Dialer{
 		LocalAddr:     &net.TCPAddr{IP: net.ParseIP(ServerConfiguration.ListenHost)},
-		Timeout:       1 * time.Second,
-		KeepAlive:     1 * time.Second,
+		Timeout:       shared.GetScaledTimeout(1, time.Second),
+		KeepAlive:     shared.GetScaledTimeout(3, time.Second),
 		DualStack:     true,
 		FallbackDelay: 10 * time.Millisecond,
 	}
@@ -115,6 +115,8 @@ func handleQuicStream(stream quic.Stream) {
 	if err != nil {
 		logger.Error("Unable to open TCP connection from QPEP stream: %s\n", err)
 		stream.Close()
+
+		shared.ScaleUpTimeout()
 		return
 	}
 	logger.Debug(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
@@ -197,7 +199,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		if speedLimit > 0 {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.CopyN(dst, src, speedLimit/10)
+			written, err = io.CopyN(dst, src, speedLimit)
 			var end = limit.Sub(time.Now())
 
 			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
@@ -261,7 +263,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		if speedLimit > 0 {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.CopyN(dst, src, speedLimit/10)
+			written, err = io.CopyN(dst, src, speedLimit)
 			var end = limit.Sub(time.Now())
 
 			//logger.Debug("t -> q: %d / %v", written, end.Nanoseconds())

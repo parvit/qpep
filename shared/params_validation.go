@@ -1,7 +1,7 @@
 package shared
 
 import (
-	. "github.com/parvit/qpep/logger"
+	"github.com/parvit/qpep/logger"
 	"net"
 	"sort"
 	"strconv"
@@ -14,20 +14,44 @@ import (
 // value is not inside the range
 func AssertParamNumeric(name string, value, min, max int) {
 	if max < min {
-		Error("Validation on parameter '%s' is not possible as numeric [%d:%d]: %d\n", name, min, max, value)
+		logger.Error("Validation on parameter '%s' is not possible as numeric [%d:%d]: %d\n", name, min, max, value)
 		panic(ErrImpossibleValidationRequested)
 	}
 	if value < min || value > max {
-		Error("Invalid parameter '%s' validated as numeric [%d:%d]: %d\n", name, min, max, value)
+		logger.Error("Invalid parameter '%s' validated as numeric [%d:%d]: %d\n", name, min, max, value)
 		panic(ErrConfigurationValidationFailed)
 	}
+}
+
+// AssertParamString panics with error ErrImpossibleValidationRequested if the value string provided is empty after trimming
+func AssertParamString(name, value string) {
+	if strings.TrimSpace(value) == "" {
+		logger.Error("Validation on parameter '%s' is not possible as it empty string: %s\n", name, value)
+		panic(ErrConfigurationValidationFailed)
+	}
+}
+
+// AssertParamChoice panics with error ErrImpossibleValidationRequested if the value string provided is not among the
+// provided values
+func AssertParamChoice(name, value string, choices []string) {
+	if len(choices) == 0 {
+		logger.Error("No valid choices provided for parameter '%s'", name)
+		panic(ErrImpossibleValidationRequested)
+	}
+	for _, c := range choices {
+		if strings.EqualFold(value, c) {
+			return
+		}
+	}
+	logger.Error("Validation on parameter '%s' is not possible as it is an allowed choice: %s - %s\n", name, value, strings.Join(choices, ","))
+	panic(ErrConfigurationValidationFailed)
 }
 
 // AssertParamIP panics with ErrConfigurationValidationFailed if the value does not represent
 // a valid ip address
 func AssertParamIP(name, value string) {
 	if ip := net.ParseIP(value); ip == nil {
-		Info("Invalid parameter '%s' validated as ip address: %s\n", name, value)
+		logger.Info("Invalid parameter '%s' validated as ip address: %s\n", name, value)
 		panic(ErrConfigurationValidationFailed)
 	}
 }
@@ -36,7 +60,7 @@ func AssertParamIP(name, value string) {
 // not inside the expected range [1-65536] for an address port
 func AssertParamPort(name string, value int) {
 	if value < 1 || value > 65536 {
-		Info("Invalid parameter '%s' validated as port [1-65536]: %d\n", name, value)
+		logger.Info("Invalid parameter '%s' validated as port [1-65536]: %d\n", name, value)
 		panic(ErrConfigurationValidationFailed)
 	}
 }
@@ -53,7 +77,7 @@ func AssertParamPortsDifferent(name string, values ...int) {
 
 	case 2:
 		if values[0] == values[1] {
-			Info("Ports '%s' must all be different: %v\n", name, values)
+			logger.Info("Ports '%s' must all be different: %v\n", name, values)
 			panic(ErrConfigurationValidationFailed)
 		}
 		AssertParamPort(name, values[0])
@@ -65,7 +89,7 @@ func AssertParamPortsDifferent(name string, values ...int) {
 		AssertParamPort(name, values[0])
 		for i := 1; i < len(values); i++ {
 			if values[i-1] == values[i] {
-				Info("Ports '%s' must all be different: %v\n", name, values)
+				logger.Info("Ports '%s' must all be different: %v\n", name, values)
 				panic(ErrConfigurationValidationFailed)
 			}
 			AssertParamPort(name, values[i])
@@ -85,7 +109,7 @@ func AssertParamHostsDifferent(name string, values ...string) {
 
 	case 2:
 		if values[0] == values[1] {
-			Info("Addresses '%s' must all be different: %v\n", name, values)
+			logger.Info("Addresses '%s' must all be different: %v\n", name, values)
 			panic(ErrConfigurationValidationFailed)
 		}
 		AssertParamIP(name, values[0])
@@ -97,7 +121,7 @@ func AssertParamHostsDifferent(name string, values ...string) {
 		AssertParamIP(name, values[0])
 		for i := 1; i < len(values); i++ {
 			if values[i-1] == values[i] {
-				Info("Addresses '%s' must all be different: %v\n", name, values)
+				logger.Info("Addresses '%s' must all be different: %v\n", name, values)
 				panic(ErrConfigurationValidationFailed)
 			}
 			AssertParamIP(name, values[i])

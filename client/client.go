@@ -117,6 +117,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 	}()
 
 	var connected = false
+	var checkIsRunning = false
 	var publicAddress = ""
 
 	// start redirection right away because we normally expect the
@@ -133,11 +134,17 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 			return
 
 		case <-time.After(1 * time.Second):
+			if checkIsRunning {
+				continue
+			}
+			checkIsRunning = true
 			localAddr := ClientConfiguration.ListenHost
 			apiAddr := ClientConfiguration.GatewayHost
 			apiPort := ClientConfiguration.APIPort
 			if !connected {
-				if ok, response := gatewayStatusCheck(localAddr, apiAddr, apiPort); ok {
+				ok, response := gatewayStatusCheck(localAddr, apiAddr, apiPort)
+				checkIsRunning = false
+				if ok {
 					publicAddress = response.Address
 					connected = true
 					logger.Info("Server returned public address %s\n", publicAddress)
@@ -154,6 +161,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 			}
 
 			connected = clientStatisticsUpdate(localAddr, apiAddr, apiPort, publicAddress)
+			checkIsRunning = false
 			if !connected {
 				logger.Info("Error during statistics update from server\n")
 
@@ -165,6 +173,7 @@ func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.Wai
 				}
 				connected = false
 			}
+			continue
 		}
 	}
 }
@@ -194,6 +203,8 @@ func initialCheckConnection() {
 func failedCheckConnection() bool {
 	maxRetries := ClientConfiguration.MaxConnectionRetries
 	preferProxy := ClientConfiguration.PreferProxy
+
+	shared.ScaleUpTimeout()
 
 	keepRedirectionRetries--
 	if preferProxy {

@@ -79,8 +79,8 @@ func (s *LoggerSuite) TestLogger_DebugLevel() {
 	SetupLogger("test")
 
 	assert.NotEqual(t, prevlog, _log)
-	assert.Equal(t, _log.GetLevel(), log.DebugLevel)
-	assert.Equal(t, log.GlobalLevel(), log.InfoLevel)
+	assert.Equal(t, log.DebugLevel, _log.GetLevel())
+	assert.Equal(t, log.InfoLevel, log.GlobalLevel())
 
 	log.SetGlobalLevel(log.DebugLevel)
 

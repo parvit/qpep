@@ -215,9 +215,24 @@ func (s *ClientSuite) TestHandleServices() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go handleServices(ctx, cancel, wg)
 
-	wg2.Wait()
-	cancel()
-	wg.Wait()
+	ch := make(chan struct{})
+
+	go func() {
+		wg2.Wait()
+		cancel()
+		wg.Wait()
+
+		ch <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		s.T().Logf("Test Timed out waiting for routines to finish")
+		s.T().FailNow()
+		return
+	case <-ch:
+		break
+	}
 
 	assert.True(s.T(), calledInitialCheck)
 	assert.True(s.T(), calledGatewayCheck)
@@ -279,9 +294,24 @@ func (s *ClientSuite) TestHandleServices_FailGateway() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go handleServices(ctx, cancel, wg)
 
-	wg2.Wait()
-	cancel()
-	wg.Wait()
+	ch := make(chan struct{})
+
+	go func() {
+		wg2.Wait()
+		cancel()
+		wg.Wait()
+
+		ch <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		s.T().Logf("Test Timed out waiting for routines to finish")
+		s.T().FailNow()
+		return
+	case <-ch:
+		break
+	}
 
 	assert.True(s.T(), calledInitialCheck)
 	assert.True(s.T(), calledGatewayCheck)
@@ -339,9 +369,24 @@ func (s *ClientSuite) TestHandleServices_FailStatistics() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go handleServices(ctx, cancel, wg)
 
-	wg2.Wait()
-	cancel()
-	wg.Wait()
+	ch := make(chan struct{})
+
+	go func() {
+		wg2.Wait()
+		cancel()
+		wg.Wait()
+
+		ch <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(10 * time.Second):
+		s.T().Logf("Test Timed out waiting for routines to finish")
+		s.T().FailNow()
+		return
+	case <-ch:
+		break
+	}
 
 	assert.True(s.T(), calledInitialCheck)
 	assert.True(s.T(), calledGatewayCheck)

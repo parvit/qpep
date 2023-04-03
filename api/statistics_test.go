@@ -2,9 +2,13 @@ package api
 
 import (
 	"bou.ke/monkey"
+	"github.com/parvit/qpep/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"reflect"
+	"sync"
 	"testing"
+	"time"
 )
 
 func TestStatisticsSuite(t *testing.T) {
@@ -15,10 +19,22 @@ func TestStatisticsSuite(t *testing.T) {
 type StatisticsSuite struct{ suite.Suite }
 
 func (s *StatisticsSuite) AfterTest(_, _ string) {
+	Statistics.Stop()
 	monkey.UnpatchAll()
 }
 
-func (s *StatisticsSuite) BeforeTest(_, _ string) {}
+func (s *StatisticsSuite) BeforeTest(_, testName string) {
+	if testName == "TestParallelExecution" {
+		return
+	}
+	Statistics.Start(&shared.AnalyticsDefinition{
+		Enabled:        true,
+		BrokerAddress:  "127.0.0.1",
+		BrokerPort:     1883,
+		BrokerProtocol: "tcp",
+		BrokerTopic:    "topic/test",
+	})
+}
 
 func (s *StatisticsSuite) TestInit() {
 	t := s.T()
@@ -82,6 +98,20 @@ func (s *StatisticsSuite) TestReset() {
 	assert.NotNil(t, st.state)
 }
 
+func (s *StatisticsSuite) TestStartStop() {
+	Statistics.Start(&shared.AnalyticsDefinition{
+		Enabled:        true,
+		BrokerAddress:  "127.0.0.1",
+		BrokerPort:     1883,
+		BrokerProtocol: "tcp",
+		BrokerTopic:    "topic/test",
+	})
+	assert.NotNil(s.T(), Statistics.brokerClient)
+
+	Statistics.Stop()
+	assert.Nil(s.T(), Statistics.brokerClient)
+}
+
 func (s *StatisticsSuite) TestAsKey() {
 	t := s.T()
 
@@ -91,6 +121,42 @@ func (s *StatisticsSuite) TestAsKey() {
 	assert.Equal(t, "prefix["+TOTAL_CONNECTIONS+"]", st.asKey("prefix", TOTAL_CONNECTIONS))
 
 	assert.Equal(t, "prefix["+TOTAL_CONNECTIONS+"-"+PERF_CONN+"]", st.asKey("prefix", TOTAL_CONNECTIONS, PERF_CONN))
+}
+
+func (s *StatisticsSuite) TestSendEvent() {
+	t := s.T()
+
+	var st = &statistics{
+		brokerClient: &analyticsClient{},
+	}
+
+	// test with enabled broker
+	var receivedName = ""
+	var receivedValue = 0.0
+	client := monkey.PatchInstanceMethod(reflect.TypeOf(st.brokerClient),
+		"SendEvent",
+		func(_ *analyticsClient, value float64, name string) {
+			receivedName = name
+			receivedValue = value
+		})
+	defer client.Unpatch()
+
+	st.sendEvent(101.0, "test")
+
+	assert.Equal(t, "test", receivedName)
+	assert.Equal(t, 101.0, receivedValue)
+
+	// test with disabled broker
+	receivedName = ""
+	receivedValue = 0.0
+
+	st.brokerClient = nil
+	assert.NotPanics(t, func() {
+		st.sendEvent(101.0, "test")
+	})
+
+	assert.Equal(t, "", receivedName)
+	assert.Equal(t, 0.0, receivedValue)
 }
 
 func (s *StatisticsSuite) TestGetCounter() {
@@ -344,6 +410,127 @@ func (s *StatisticsSuite) TestGetHosts() {
 
 	st.DeleteMappedAddress("192.168.1.1")
 	assertArrayEqualsString(t, []string{}, st.GetHosts())
+}
+
+func (s *StatisticsSuite) TestParallelExecution() {
+	Statistics.Reset()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(13)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.SetCounter(10000.0, "cnt", "1", "2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.GetCounter("cnt", "1", "2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.GetCounterAndClear("cnt", "1", "2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.IncrementCounter(2.0, "cnt", "1", "2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.DecrementCounter(2.0, "cnt", "1", "2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.SetMappedAddress("127.0.0.1", "127.0.0.2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.GetMappedAddress("127.0.0.1")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.DeleteMappedAddress("127.0.0.1")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.SetState("st1", "127.0.0.2")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.GetState("st1")
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.GetHosts()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			var count = 0
+			Statistics.semCounters.RLock()
+			for range Statistics.counters {
+				count++
+			}
+			Statistics.semCounters.RUnlock()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			var count = 0
+			Statistics.semState.RLock()
+			for range Statistics.state {
+				count++
+			}
+			Statistics.semState.RUnlock()
+		}
+	}()
+
+	var finished = false
+
+	// If any goroutine remains hanged then this will unblock the waitgroup
+	go func() {
+		<-time.After(10 * time.Second)
+		if finished {
+			return
+		}
+		for !finished {
+			func() {
+				defer func() {
+					if err := recover(); err != nil {
+						finished = true
+					}
+				}()
+				wg.Done()
+			}()
+		}
+		s.T().FailNow()
+	}()
+
+	wg.Wait()
+
+	finished = true
 }
 
 // --- Utils --- //

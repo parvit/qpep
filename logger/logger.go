@@ -57,7 +57,7 @@ func SetupLogger(logName string) {
 	log.SetGlobalLevel(log.InfoLevel)
 	log.TimeFieldFormat = time.StampMilli
 
-	_log = log.New(_logFile).Level(log.InfoLevel).
+	_log = log.New(_logFile).Level(log.DebugLevel).
 		With().Timestamp().Logger()
 }
 

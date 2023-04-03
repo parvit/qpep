@@ -12,10 +12,6 @@ import (
 	"github.com/parvit/qpep/shared"
 )
 
-var (
-	ExeDir = ""
-)
-
 func main() {
 	defer func() {
 		// clear the proxy in case a orphaned client cannot
@@ -27,9 +23,10 @@ func main() {
 	interruptListener := make(chan os.Signal, 1)
 	signal.Notify(interruptListener, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
+	// open the log file in current directory
 	ExeDir, _ = filepath.Abs(filepath.Dir(os.Args[0]))
 
-	f, err := os.OpenFile("qpep-tray.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	f, err := os.OpenFile(filepath.Join(ExeDir, "qpep-tray.log"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -39,6 +36,7 @@ func main() {
 
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
+	// read configuration
 	if err := shared.ReadConfiguration(true); err != nil {
 		ErrorMsg("Could not load configuration file, please edit: %v", err)
 	}

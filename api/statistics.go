@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"github.com/parvit/qpep/logger"
+	"github.com/parvit/qpep/shared"
 	"strings"
 	"sync"
 )
@@ -55,6 +56,11 @@ type statistics struct {
 	state map[string]string
 	// hosts cache of the destination host addresses the system is connected to
 	hosts []string
+
+	// brokerClient is the client for connection to the mqtt-based analytics service
+	brokerClient *analyticsClient
+	// anChangedCounters is the map of the modified counters in the interval to send to analytics
+	anChangedCounters map[string]struct{}
 }
 
 // init called automatically before any operation that accesses the tracked data
@@ -79,6 +85,20 @@ func (s *statistics) Reset() {
 	logger.Debug("Statistics reset.")
 	s.counters = make(map[string]float64)
 	s.state = make(map[string]string)
+	s.anChangedCounters = make(map[string]struct{})
+}
+
+// Start method calls implicitly the Reset method and launches the broker client
+// with the provided configuration
+func (s *statistics) Start(brokerConfig *shared.AnalyticsDefinition) {
+	s.Reset()
+	s.launchAnalyticsBrokerClient(brokerConfig)
+}
+
+// Stop method terminates the broker client if it is was effectively launched
+func (s *statistics) Stop() {
+	s.stopAnalyticsBrokerClient()
+	s.brokerClient = nil
 }
 
 // asKey method abstract the generation of the attribute keys from a given prefix
@@ -98,6 +118,15 @@ func (s *statistics) asKey(prefix string, subkeys ...string) string {
 		break
 	}
 	return strings.ToLower(key)
+}
+
+// sendEvent method wraps the send operation to the analytics client
+// if it is enabled / available
+func (s *statistics) sendEvent(value float64, key string) {
+	if s.brokerClient == nil {
+		return
+	}
+	s.brokerClient.SendEvent(value, key)
 }
 
 // ---- Counters ---- //
@@ -138,6 +167,7 @@ func (s *statistics) SetCounter(value float64, prefix string, keyparts ...string
 	defer s.semCounters.Unlock()
 
 	s.counters[key] = value
+	s.sendEvent(value, key)
 	logger.Debug("SET counter: %s = %.2f\n", key, s.counters[key])
 	return value
 }
@@ -179,13 +209,16 @@ func (s *statistics) IncrementCounter(incr float64, prefix string, keyparts ...s
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
+	logger.Debug("INCR counter: %s = %.2f\n", key, s.counters[key])
 	value, ok := s.counters[key]
 	if !ok {
 		s.counters[key] = incr
+		s.sendEvent(incr, key)
 		return incr
 	}
 
 	s.counters[key] = value + incr
+	s.sendEvent(s.counters[key], key)
 	return s.counters[key]
 }
 
@@ -208,15 +241,16 @@ func (s *statistics) DecrementCounter(decr float64, prefix string, keyparts ...s
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
+	logger.Debug("DECR counter: %s = %.2f\n", key, s.counters[key])
 	value, ok := s.counters[key]
 	if !ok || value-1.0 < 0.0 {
 		s.counters[key] = 0.0
 		return 0.0
 	}
 
-	logger.Debug("counter: %s = %.2f\n", key, value-decr)
 	s.counters[key] = value - decr
-	return value - decr
+	s.sendEvent(s.counters[key], key)
+	return s.counters[key]
 }
 
 // ---- State ---- //

@@ -192,7 +192,7 @@ func (s *ClientNetworkSuite) TestFailedCheckConnection_PreferProxyKeepRedirect()
 	})
 
 	assert.False(s.T(), failedCheckConnection())
-	assert.Equal(s.T(), 2, callCounter)
+	assert.Equal(s.T(), 1, callCounter)
 	assert.Equal(s.T(), 9, keepRedirectionRetries)
 
 	assert.True(s.T(), shared.UsingProxy)
@@ -505,9 +505,9 @@ func (s *ClientNetworkSuite) TestHandleTCPConn_NoMultistreamProxy() {
 		return windivert.DIVERT_ERROR_FAILED, 0, 0, "", ""
 	})
 	var calledHandleProxy = false
-	monkey.Patch(handleProxyOpenConnection, func(*shared.QPepHeader, net.Conn, quic.Stream) error {
+	monkey.Patch(handleProxyOpenConnection, func(net.Conn) (*http.Request, error) {
 		calledHandleProxy = true
-		return nil
+		return nil, nil
 	})
 	var calledQuicHandler = false
 	monkey.Patch(handleTcpToQuic, func(_ context.Context, wg *sync.WaitGroup, _ quic.Stream, _ net.Conn) {
@@ -672,7 +672,11 @@ User-Agent: windows
 `, method)
 		srcConn.readData.WriteString(testdata)
 
-		var handleError = handleProxyOpenConnection(header, srcConn, dstConn)
+		var request, openError = handleProxyOpenConnection(srcConn)
+		assert.Nil(s.T(), openError)
+
+		assert.NotNil(s.T(), request)
+		var handleError = handleProxyedRequest(request, header, srcConn, dstConn)
 
 		assert.Nil(s.T(), handleError)
 		assert.NotNil(s.T(), dstConn.writtenData)
@@ -714,33 +718,27 @@ User-Agent: windows
 }
 
 func (s *ClientNetworkSuite) TestHandleProxyOpenConnection_NoData() {
-	header := &shared.QPepHeader{}
-	dstConn := &fakeStream{}
 	srcConn := &fakeTcpConn{}
 
-	handleError := handleProxyOpenConnection(header, srcConn, dstConn)
+	request, handleError := handleProxyOpenConnection(srcConn)
 
+	assert.Nil(s.T(), request)
 	assert.Equal(s.T(), shared.ErrNonProxyableRequest, handleError)
 }
 
 func (s *ClientNetworkSuite) TestHandleProxyOpenConnection_FailHttpRead() {
-	header := &shared.QPepHeader{}
-	dstConn := &fakeStream{}
-
 	srcConn := &fakeTcpConn{}
 	srcConn.readData = &bytes.Buffer{}
 	var testdata = `GET `
 	srcConn.readData.WriteString(testdata)
 
-	handleError := handleProxyOpenConnection(header, srcConn, dstConn)
+	request, handleError := handleProxyOpenConnection(srcConn)
 
+	assert.Nil(s.T(), request)
 	assert.Equal(s.T(), shared.ErrNonProxyableRequest, handleError)
 }
 
 func (s *ClientNetworkSuite) TestHandleProxyOpenConnection_FailHostRead_GET() {
-	header := &shared.QPepHeader{}
-	dstConn := &fakeStream{}
-
 	srcConn := &fakeTcpConn{}
 	srcConn.readData = &bytes.Buffer{}
 	var testdata = `GET /api/v1/server/echo HTTP/1.1
@@ -748,15 +746,13 @@ Host: TEST:9443
 
 `
 	srcConn.readData.WriteString(testdata)
-	handleError := handleProxyOpenConnection(header, srcConn, dstConn)
+	request, handleError := handleProxyOpenConnection(srcConn)
 
+	assert.Nil(s.T(), request)
 	assert.Equal(s.T(), shared.ErrNonProxyableRequest, handleError)
 }
 
 func (s *ClientNetworkSuite) TestHandleProxyOpenConnection_FailHostRead_CONNECT() {
-	header := &shared.QPepHeader{}
-	dstConn := &fakeStream{}
-
 	srcConn := &fakeTcpConn{}
 	srcConn.readData = &bytes.Buffer{}
 	var testdata = `CONNECT /api/v1/server/echo HTTP/1.1
@@ -764,8 +760,9 @@ Host: TEST:9443
 
 `
 	srcConn.readData.WriteString(testdata)
-	handleError := handleProxyOpenConnection(header, srcConn, dstConn)
+	request, handleError := handleProxyOpenConnection(srcConn)
 
+	assert.Nil(s.T(), request)
 	assert.Equal(s.T(), shared.ErrNonProxyableRequest, handleError)
 }
 
@@ -782,10 +779,12 @@ User-Agent: windows
 
 
 `
+
 	srcConn.readData.WriteString(testdata)
 
-	var handleError = handleProxyOpenConnection(nil, srcConn, dstConn)
+	request, handleError := handleProxyOpenConnection(srcConn)
 
+	assert.Nil(s.T(), request)
 	assert.Equal(s.T(), shared.ErrNonProxyableRequest, handleError)
 
 	assert.NotNil(s.T(), srcConn.writtenData)

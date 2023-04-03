@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-    <Product Id="*" UpgradeCode="{A61174C8-632E-41AC-8AF4-3C27F455298F}" Version="1.0.0.0" Language="1033" Name="QPep" Manufacturer="ProjectFaster">
+    <Product Id="*" UpgradeCode="{A61174C8-632E-41AC-8AF4-3C27F455298F}" Version="1.0.2.1" Language="1033" Name="QPep" Manufacturer="ProjectFaster">
         <Package InstallerVersion="300" Compressed="yes" InstallPrivileges="elevated" InstallScope="perMachine"/>
         <Media Id="1" Cabinet="qpep.cab" EmbedCab="yes" />
 
@@ -19,7 +19,29 @@
 
         <SetDirectory Id="TARGETDIR" Value="[ProgramFilesFolder][ProductName]"/>
 
-        <CustomAction Id="RegisterClientService" 
+        <Binary Id="CustomActionBinary" SourceFile="$(var.CheckServiceInstalled.TargetDir)$(var.CheckServiceInstalled.TargetName).CA.dll" />
+        <CustomAction Id="CheckInstalledService"
+            Impersonate="no"
+            BinaryKey="CustomActionBinary"
+            DllEntry="CustomAction1"
+            Execute="deferred"
+            Return="check"
+            />
+
+      <CustomAction Id="CheckClientService"
+          Impersonate="no"
+          FileKey="qpep.exe"
+          ExeCommand=" --client --service status &gt; NUL 2&gt;&amp;1 &amp; echo %errorlevel% | find /i &quot;255&quot;"
+          Execute="deferred"
+          Return="check" />
+      <CustomAction Id="CheckServerService"
+          Impersonate="no"
+          FileKey="qpep.exe"
+          ExeCommand=" --service status &gt; NUL 2&gt;&amp;1 &amp; echo %errorlevel% | find /i &quot;255&quot;"
+          Execute="deferred"
+          Return="check" />
+
+      <CustomAction Id="RegisterClientService"
             Impersonate="no" 
             FileKey="qpep.exe"
             ExeCommand="--service install --client" 
@@ -106,6 +128,7 @@
         </UI>
 
         <InstallExecuteSequence>
+            <Custom Action='CheckInstalledService' Before='InstallFinalize'>NOT Installed</Custom>
             <Custom Action='RegisterClientService' Before='InstallFinalize'>NOT Installed</Custom>
             <Custom Action='RegisterServerService' Before='InstallFinalize'>NOT Installed</Custom>
             <Custom Action='UnregisterClientService' Before='RemoveFiles'>Installed</Custom>

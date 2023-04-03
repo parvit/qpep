@@ -13,7 +13,7 @@ func GetQuicConfiguration() *quic.Config {
 		MaxIncomingStreams:      1024,
 		DisablePathMTUDiscovery: false,
 
-		HandshakeIdleTimeout: 100 * time.Millisecond,
+		HandshakeIdleTimeout: GetScaledTimeout(1, time.Second),
 	}
 
 	// Only used in debug sessions
