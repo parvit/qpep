@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-    <Product Id="*" UpgradeCode="{A61174C8-632E-41AC-8AF4-3C27F455298F}" Version="1.0.2.1" Language="1033" Name="QPep" Manufacturer="ProjectFaster">
+    <Product Id="*" UpgradeCode="{A61174C8-632E-41AC-8AF4-3C27F455298F}" Version="1.0.3.0" Language="1033" Name="QPep" Manufacturer="ProjectFaster">
         <Package InstallerVersion="300" Compressed="yes" InstallPrivileges="elevated" InstallScope="perMachine"/>
         <Media Id="1" Cabinet="qpep.cab" EmbedCab="yes" />
 

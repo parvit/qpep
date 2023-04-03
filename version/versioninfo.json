@@ -2,23 +2,23 @@
   "FixedFileInfo": {
     "FileVersion": {
       "Major": 0,
-      "Minor": 2,
-      "Patch": 1,
+      "Minor": 3,
+      "Patch": 0,
       "Build": 0
     },
     "ProductVersion": {
       "Major": 0,
-      "Minor": 2,
-      "Patch": 1,
+      "Minor": 3,
+      "Patch": 0,
       "Build": 0
     }
   },
   "StringFileInfo": {
     "FileDescription": "QPep - High-latency network accelerator",
-    "FileVersion": "v0.2.1.0",
+    "FileVersion": "v0.3.0.0",
     "InternalName": "qpep.exe",
     "ProductName": "QPep",
-    "ProductVersion": "v0.2.1",
+    "ProductVersion": "v0.3.0",
     "SpecialBuild": ""
 },
   "IconPath": "../qpep-tray/icons/main_icon_connected.ico"
