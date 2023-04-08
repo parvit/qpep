@@ -36,63 +36,15 @@ func (s *StatisticsSuite) BeforeTest(_, testName string) {
 	})
 }
 
-func (s *StatisticsSuite) TestInit() {
-	t := s.T()
-
-	var st = &statistics{}
-	assert.Nil(t, st.semCounters)
-	assert.Nil(t, st.semState)
-	assert.Nil(t, st.hosts)
-	assert.Nil(t, st.counters)
-	assert.Nil(t, st.state)
-
-	st.init()
-	assert.NotNil(t, st.semCounters)
-	assert.NotNil(t, st.semState)
-	assert.NotNil(t, st.hosts)
-	assert.Nil(t, st.counters)
-	assert.Nil(t, st.state)
-
-	// already init coverage
-	var prevCounter = st.semCounters
-	var prevState = st.semState
-	st.init()
-	assert.NotNil(t, st.semCounters)
-	assert.NotNil(t, st.semState)
-	assert.Equal(t, prevCounter, st.semCounters)
-	assert.Equal(t, prevState, st.semState)
-
-	assert.NotNil(t, st.hosts)
-	assert.Nil(t, st.counters)
-	assert.Nil(t, st.state)
-}
-
 func (s *StatisticsSuite) TestReset() {
 	t := s.T()
 
 	var st = &statistics{}
-	assert.Nil(t, st.semCounters)
-	assert.Nil(t, st.semState)
 	assert.Nil(t, st.hosts)
 	assert.Nil(t, st.counters)
 	assert.Nil(t, st.state)
 
 	st.Reset()
-	assert.NotNil(t, st.semCounters)
-	assert.NotNil(t, st.semState)
-	assert.NotNil(t, st.hosts)
-	assert.NotNil(t, st.counters)
-	assert.NotNil(t, st.state)
-
-	// already init coverage
-	var prevCounter = st.semCounters
-	var prevState = st.semState
-	st.Reset()
-	assert.NotNil(t, st.semCounters)
-	assert.NotNil(t, st.semState)
-	assert.True(t, prevCounter != st.semCounters)
-	assert.True(t, prevState != st.semState)
-
 	assert.NotNil(t, st.hosts)
 	assert.NotNil(t, st.counters)
 	assert.NotNil(t, st.state)
@@ -416,8 +368,14 @@ func (s *StatisticsSuite) TestParallelExecution() {
 	Statistics.Reset()
 
 	wg := &sync.WaitGroup{}
-	wg.Add(13)
+	wg.Add(14)
 
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100000; i++ {
+			Statistics.Reset()
+		}
+	}()
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 100000; i++ {

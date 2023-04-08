@@ -46,9 +46,9 @@ func init() {
 // be either counters with float64 type or state string values
 type statistics struct {
 	// semCounters read/write mutex for counters
-	semCounters *sync.RWMutex
+	semCounters sync.RWMutex
 	// semState read/write mutex for states
-	semState *sync.RWMutex
+	semState sync.RWMutex
 
 	// counters map of the numerical values kept track of
 	counters map[string]float64
@@ -59,33 +59,24 @@ type statistics struct {
 
 	// brokerClient is the client for connection to the mqtt-based analytics service
 	brokerClient *analyticsClient
-	// anChangedCounters is the map of the modified counters in the interval to send to analytics
-	anChangedCounters map[string]struct{}
-}
-
-// init called automatically before any operation that accesses the tracked data
-// ensuring that the locking elements are initialized
-func (s *statistics) init() {
-	if s.semCounters != nil && s.semState != nil {
-		return
-	}
-
-	logger.Debug("Statistics init.")
-	s.semCounters = &sync.RWMutex{}
-	s.semState = &sync.RWMutex{}
-	s.hosts = make([]string, 0, 32)
+	// changedCounters is the map of the modified counters in the interval to send to analytics
+	changedCounters map[string]struct{}
 }
 
 // Reset called every time all the data is to thrown away and reinitialized
 func (s *statistics) Reset() {
-	s.semCounters = nil
-	s.semState = nil
-	s.init()
+	s.semState.Lock()
+	s.semCounters.Lock()
+	defer func() {
+		s.semState.Unlock()
+		s.semCounters.Unlock()
+	}()
 
 	logger.Debug("Statistics reset.")
 	s.counters = make(map[string]float64)
 	s.state = make(map[string]string)
-	s.anChangedCounters = make(map[string]struct{})
+	s.changedCounters = make(map[string]struct{})
+	s.hosts = make([]string, 0, 32)
 }
 
 // Start method calls implicitly the Reset method and launches the broker client
@@ -139,7 +130,6 @@ func (s *statistics) GetCounter(prefix string, subkeys ...string) float64 {
 		return -1
 	}
 
-	s.init()
 	s.semCounters.RLock()
 	defer s.semCounters.RUnlock()
 
@@ -162,7 +152,6 @@ func (s *statistics) SetCounter(value float64, prefix string, keyparts ...string
 		return -1
 	}
 
-	s.init()
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
@@ -180,7 +169,6 @@ func (s *statistics) GetCounterAndClear(prefix string, keyparts ...string) float
 		return -1
 	}
 
-	s.init()
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
@@ -205,7 +193,6 @@ func (s *statistics) IncrementCounter(incr float64, prefix string, keyparts ...s
 	if len(key) <= 2 {
 		return -1
 	}
-	s.init()
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
@@ -237,7 +224,6 @@ func (s *statistics) DecrementCounter(decr float64, prefix string, keyparts ...s
 		return -1.0
 	}
 
-	s.init()
 	s.semCounters.Lock()
 	defer s.semCounters.Unlock()
 
@@ -263,7 +249,6 @@ func (s *statistics) GetState(prefix string, keyparts ...string) string {
 		return ""
 	}
 
-	s.init()
 	s.semState.RLock()
 	defer s.semState.RUnlock()
 
@@ -281,7 +266,6 @@ func (s *statistics) SetState(prefix, value string, keyparts ...string) string {
 		return ""
 	}
 
-	s.init()
 	s.semState.Lock()
 	defer s.semState.Unlock()
 
@@ -294,7 +278,6 @@ func (s *statistics) SetState(prefix, value string, keyparts ...string) string {
 // If not present or the key is empty then returns empty string.
 // Note that after a failed call the key will still not exist.
 func (s *statistics) GetMappedAddress(source string) string {
-	s.init()
 	s.semState.RLock()
 	defer s.semState.RUnlock()
 
@@ -307,7 +290,6 @@ func (s *statistics) GetMappedAddress(source string) string {
 // SetMappedAddress method creates an association between the destination address and
 // the given source address and then updates the hosts cache and counters accordingly.
 func (s *statistics) SetMappedAddress(source string, dest string) {
-	s.init()
 	if len(source) == 0 || len(dest) == 0 {
 		return
 	}
@@ -334,7 +316,6 @@ func (s *statistics) SetMappedAddress(source string, dest string) {
 // DeleteMappedAddress removes a source address from the mapped addresses, the referenced
 // destiniation hosts are only removed from the cache if no other source map it.
 func (s *statistics) DeleteMappedAddress(source string) {
-	s.init()
 	s.semState.Lock()
 	defer s.semState.Unlock()
 
@@ -368,7 +349,6 @@ func (s *statistics) DeleteMappedAddress(source string) {
 // ---- hosts ---- //
 // GetHosts method returns the current list of destination addresses being contacted
 func (s *statistics) GetHosts() []string {
-	s.init()
 	s.semState.RLock()
 	defer s.semState.RUnlock()
 
