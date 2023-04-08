@@ -2,14 +2,12 @@ version: "3"
 
 services:
   linux-build:
-    image: project-faster/qpep:${QPEP_REV}
+    image: project-faster/qpep_linux
     build:
       context: .
     environment:
       - QPEP_REPO=https://github.com/Project-Faster/qpep.git
       - QPEP_BRANCH=main
       - QPEP_REV=HEAD
-
-# if output is desired on disk and not image uncomment this with the destination
-#    volumes:
-#      - ./build:/build
+    volumes:
+      - ../build:/build
