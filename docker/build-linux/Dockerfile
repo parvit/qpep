@@ -34,6 +34,7 @@ git reset --hard ${QPEP_REV} \n\
 export PATH=$GOROOT/bin:$PATH \n\
 echo [BUILD] \n\
 go build -v -o qpep \n\
+chmod +x qpep \n\
 cp /root/qpep/qpep /build/qpep \n\
 echo [DONE] \n\
 ' > /root/build-qpep.sh

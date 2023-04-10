@@ -10,4 +10,4 @@ services:
       - QPEP_BRANCH=main
       - QPEP_REV=HEAD
     volumes:
-      - ../build:/build
+      - ./build:/build
