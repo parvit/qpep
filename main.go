@@ -1,30 +1,38 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"context"
+	"github.com/parvit/qpep/logger"
+	"github.com/parvit/qpep/service"
 	"os"
-	"os/signal"
-
-	"github.com/virtuallynathan/qpep/client"
-	"github.com/virtuallynathan/qpep/server"
-	"github.com/virtuallynathan/qpep/shared"
+	"runtime/debug"
+	"runtime/trace"
 )
 
+func init() {
+	logger.SetupLogger("qpep-service.log")
+}
+
 func main() {
-	client.ClientConfiguration.GatewayHost = shared.QuicConfiguration.GatewayIP
+	f, _ := os.Create("trace.out")
+	trace.Start(f)
 
-	if shared.QuicConfiguration.ClientFlag {
-		fmt.Println("Running Client")
-		go client.RunClient()
-	} else {
-		go server.RunServer()
-	}
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Error("PANIC: %v", err)
+			debug.PrintStack()
+		}
+		trace.Stop()
+		f.Sync()
+		f.Close()
+	}()
 
-	interruptListener := make(chan os.Signal)
-	signal.Notify(interruptListener, os.Interrupt)
-	<-interruptListener
+	_, tsk := trace.NewTask(context.Background(), "ServiceMain")
+	retcode := service.ServiceMain()
+	tsk.End()
 
-	log.Println("Exiting...")
-	os.Exit(1)
+	logger.Info("=== EXIT - code(%d) ===", retcode)
+	logger.CloseLogger()
+
+	os.Exit(retcode)
 }

@@ -1,184 +1,313 @@
 package client
 
 import (
-	"crypto/tls"
-	"io"
-	"log"
+	"github.com/parvit/qpep/logger"
 	"net"
-	"os"
-	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"time"
 
-	"github.com/lucas-clemente/quic-go"
-	"github.com/virtuallynathan/qpep/shared"
+	"github.com/parvit/qpep/api"
+	"github.com/parvit/qpep/shared"
 	"golang.org/x/net/context"
 )
 
+const (
+	// INITIAL_BUFF_SIZE indicates the initial receive buffer for connections
+	INITIAL_BUFF_SIZE = int64(4096)
+)
+
 var (
-	proxyListener       net.Listener
-	ClientConfiguration = ClientConfig{ListenHost: "0.0.0.0", ListenPort: 8080,
-		GatewayHost: "198.18.0.254", GatewayPort: 443,
-		QuicStreamTimeout: 2, MultiStream: shared.QuicConfiguration.MultiStream,
-		ConnectionRetries: 3,
-		IdleTimeout:       time.Duration(300) * time.Second}
-	quicSession             quic.Session
-	QuicClientConfiguration = quic.Config{
-		MaxIncomingStreams: 40000,
+	// redirected indicates if the connections are using the diverter for connection
+	redirected = false
+	// keepRedirectionRetries counter for the number of retries to keep trying to get a connection to server
+	keepRedirectionRetries = shared.DEFAULT_REDIRECT_RETRIES
+
+	// ClientConfiguration instance of the default configuration for the client
+	ClientConfiguration = ClientConfig{
+		ListenHost: "0.0.0.0", ListenPort: 9443,
+		GatewayHost: "198.56.1.10", GatewayPort: 443,
+		RedirectedInterfaces: []int64{},
+		QuicStreamTimeout:    2, MultiStream: shared.QPepConfig.MultiStream,
+		MaxConnectionRetries: shared.DEFAULT_REDIRECT_RETRIES,
+		IdleTimeout:          time.Duration(300) * time.Second,
+		WinDivertThreads:     1,
+		Verbose:              false,
 	}
 )
 
+// ClientConfig struct that describes the parameter that can influence the behavior of the client
 type ClientConfig struct {
-	ListenHost        string
-	ListenPort        int
-	GatewayHost       string
-	GatewayPort       int
+	// ListenHost local address on which to listen for diverted / proxied connections
+	ListenHost string
+	// ListenPort local port on which to listen for diverted / proxied connections
+	ListenPort int
+	// GatewayHost remote address of the qpep server to which to establish quic connections
+	GatewayHost string
+	// GatewayPort remote port of the qpep server to which to establish quic connections
+	GatewayPort int
+	// RedirectedInterfaces list of ids of the interfaces that can be included for redirection
+	RedirectedInterfaces []int64
+	// APIPort Indicates the local/remote port of the API server (local will be 127.0.0.1:<APIPort>, remote <GatewayHost>:<APIPort>)
+	APIPort int
+	// QuicStreamTimeout Timeout in seconds for which to wait for a successful quic connection to the qpep server
 	QuicStreamTimeout int
-	MultiStream       bool
-	IdleTimeout       time.Duration
-	ConnectionRetries int
+	// MultiStream indicates whether to enable the MultiStream option in quic-go library
+	MultiStream bool
+	// IdleTimeout Timeout after which, without activity, a connected quic stream is closed
+	IdleTimeout time.Duration
+	// MaxConnectionRetries Maximum number of tries for a qpep server connection after which the client is terminated
+	MaxConnectionRetries int
+	// PreferProxy If True, the first half of the MaxConnectionRetries uses the proxy instead of diverter, False is reversed
+	PreferProxy bool
+	// WinDivertThreads number of native threads that the windivert engine will be allowed to use
+	WinDivertThreads int
+	// Verbose outputs more log
+	Verbose bool
 }
 
-func RunClient() {
-	log.Println("Starting TCP-QPEP Tunnel Listener")
-	log.Printf("Binding to TCP %s:%d", ClientConfiguration.ListenHost, ClientConfiguration.ListenPort)
+// RunClient method executes the qpep in client mode and initializes its services
+func RunClient(ctx context.Context, cancel context.CancelFunc) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Info("PANIC: %v", err)
+			debug.PrintStack()
+		}
+		if proxyListener != nil {
+			proxyListener.Close()
+		}
+		cancel()
+	}()
+	logger.Info("Starting TCP-QPEP Tunnel Listener")
+
+	// update configuration from flags
+	validateConfiguration()
+
+	logger.Info("Binding to TCP %s:%d", ClientConfiguration.ListenHost, ClientConfiguration.ListenPort)
 	var err error
-	proxyListener, err = NewClientProxyListener("tcp", &net.TCPAddr{IP: net.ParseIP(ClientConfiguration.ListenHost),
-		Port: ClientConfiguration.ListenPort})
+	proxyListener, err = NewClientProxyListener("tcp", &net.TCPAddr{
+		IP:   net.ParseIP(ClientConfiguration.ListenHost),
+		Port: ClientConfiguration.ListenPort,
+	})
 	if err != nil {
-		log.Fatalf("Encountered error when binding client proxy listener: %s", err)
+		logger.Error("Encountered error when binding client proxy listener: %s", err)
+		return
 	}
 
-	defer proxyListener.Close()
+	wg := &sync.WaitGroup{}
+	wg.Add(2)
 
-	go ListenTCPConn()
+	go listenTCPConn(wg)
+	go handleServices(ctx, cancel, wg)
 
-	interruptListener := make(chan os.Signal)
-	signal.Notify(interruptListener, os.Interrupt)
-	<-interruptListener
-	log.Println("Exiting...")
-	os.Exit(1)
+	wg.Wait()
 }
 
-func ListenTCPConn() {
+// handleServices method encapsulates the logic for checking the connection to the server
+// by executing API calls
+func handleServices(ctx context.Context, cancel context.CancelFunc, wg *sync.WaitGroup) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Info("PANIC: %v", err)
+			debug.PrintStack()
+		}
+		wg.Done()
+		cancel()
+	}()
+
+	var connected = false
+	var checkIsRunning = false
+	var publicAddress = ""
+
+	// start redirection right away because we normally expect the
+	// connection with the server to be on already up
+	initialCheckConnection()
+
+	// Update loop
 	for {
-		conn, err := proxyListener.Accept()
-		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Temporary() {
-				log.Printf("Temporary error when accepting connection: %s", netErr)
+		select {
+		case <-ctx.Done():
+			if proxyListener != nil {
+				proxyListener.Close()
 			}
-			log.Fatalf("Unrecoverable error while accepting connection: %s", err)
 			return
+
+		case <-time.After(1 * time.Second):
+			if checkIsRunning {
+				continue
+			}
+			checkIsRunning = true
+			localAddr := ClientConfiguration.ListenHost
+			apiAddr := ClientConfiguration.GatewayHost
+			apiPort := ClientConfiguration.APIPort
+			if !connected {
+				ok, response := gatewayStatusCheck(localAddr, apiAddr, apiPort)
+				checkIsRunning = false
+				if ok {
+					publicAddress = response.Address
+					connected = true
+					logger.Info("Server returned public address %s\n", publicAddress)
+
+				} else {
+					// if connection is lost then keep the redirection active
+					// for a certain number of retries then terminate to not keep
+					// all the network blocked
+					if failedCheckConnection() {
+						return
+					}
+				}
+				continue
+			}
+
+			connected = clientStatisticsUpdate(localAddr, apiAddr, apiPort, publicAddress)
+			checkIsRunning = false
+			if !connected {
+				logger.Info("Error during statistics update from server\n")
+
+				// if connection is lost then keep the redirection active
+				// for a certain number of retries then terminate to not keep
+				// all the network blocked
+				if failedCheckConnection() {
+					return
+				}
+				connected = false
+			}
+			continue
 		}
-
-		go handleTCPConn(conn)
 	}
-
 }
 
-func handleTCPConn(tcpConn net.Conn) {
-	log.Printf("Accepting TCP connection from %s with destination of %s", tcpConn.RemoteAddr().String(), tcpConn.LocalAddr().String())
-	defer tcpConn.Close()
-	var quicStream quic.Stream = nil
-	// if we allow for multiple streams in a session, lets try and open on the existing session
-	if ClientConfiguration.MultiStream {
-		//if we have already opened a quic session, lets check if we've expired our stream
-		if quicSession != nil {
-			var err error
-			log.Printf("Trying to open on existing session")
-			quicStream, err = quicSession.OpenStream()
-			// if we weren't able to open a quicStream on that session (usually inactivity timeout), we can try to open a new session
-			if err != nil {
-				log.Printf("Unable to open new stream on existing QUIC session: %s\n", err)
-				quicStream = nil
-			} else {
-				log.Printf("Opened a new stream: %d", quicStream.StreamID())
-			}
-		}
-	}
-	// if we haven't opened a stream from multistream, we can open one with a new session
-	if quicStream == nil {
-		// open a new quicSession (with all the TLS jazz)
-		var err error
-		quicSession, err = openQuicSession()
-		// if we were unable to open a quic session, drop the TCP connection with RST
-		if err != nil {
-			return
-		}
-
-		//Open a stream to send data on this new session
-		quicStream, err = quicSession.OpenStreamSync(context.Background())
-		// if we cannot open a stream on this session, send a TCP RST and let the client decide to try again
-		if err != nil {
-			log.Printf("Unable to open QUIC stream: %s\n", err)
-			return
-		}
-	}
-	defer quicStream.Close()
-
-	//We want to wait for both the upstream and downstream to finish so we'll set a wait group for the threads
-	var streamWait sync.WaitGroup
-	streamWait.Add(2)
-
-	//Set our custom header to the QUIC session so the server can generate the correct TCP handshake on the other side
-	sessionHeader := shared.QpepHeader{SourceAddr: tcpConn.RemoteAddr().(*net.TCPAddr), DestAddr: tcpConn.LocalAddr().(*net.TCPAddr)}
-	_, err := quicStream.Write(sessionHeader.ToBytes())
-	if err != nil {
-		log.Printf("Error writing to quic stream: %s", err.Error())
-	}
-	log.Printf("Sent QUIC header to server")
-
-	streamQUICtoTCP := func(dst *net.TCPConn, src quic.Stream) {
-		_, err := io.Copy(dst, src)
-		dst.SetLinger(3)
-		dst.Close()
-		//src.CancelRead(1)
-		//src.Close()
-		if err != nil {
-			log.Printf("Error on Copy %s", err)
-		}
-		streamWait.Done()
+// initialCheckConnection method checks whether the connections checks are to initialized or not
+// and honors the PreferProxy setting
+func initialCheckConnection() {
+	if redirected || shared.UsingProxy {
+		// no need to restart, already redirected
+		return
 	}
 
-	streamTCPtoQUIC := func(dst quic.Stream, src *net.TCPConn) {
-		_, err := io.Copy(dst, src)
-		src.SetLinger(3)
-		src.Close()
-		//src.CloseWrite()
-		//dst.CancelWrite(1)
-		//dst.Close()
-		if err != nil {
-			log.Printf("Error on Copy %s", err)
-		}
-		streamWait.Done()
+	keepRedirectionRetries = ClientConfiguration.MaxConnectionRetries // reset connection tries
+	preferProxy := ClientConfiguration.PreferProxy
+
+	if preferProxy {
+		logger.Info("Proxy preference set, trying to connect...\n")
+		initProxy()
+		return
 	}
 
-	//Proxy all stream content from quic to TCP and from TCP to quic
-	go streamTCPtoQUIC(quicStream, tcpConn.(*net.TCPConn))
-	go streamQUICtoTCP(tcpConn.(*net.TCPConn), quicStream)
-
-	//we exit (and close the TCP connection) once both streams are done copying
-	streamWait.Wait()
-	quicStream.Close()
-	log.Printf("Done sending data on %d", quicStream.StreamID())
+	initDiverter()
 }
 
-func openQuicSession() (quic.Session, error) {
-	var err error
-	var session quic.Session
-	tlsConf := &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"qpep"}}
-	gatewayPath := ClientConfiguration.GatewayHost + ":" + strconv.Itoa(ClientConfiguration.GatewayPort)
-	quicClientConfig := QuicClientConfiguration
-	for i := 0; i < ClientConfiguration.ConnectionRetries; i++ {
-		session, err = quic.DialAddr(gatewayPath, tlsConf, &quicClientConfig)
-		if err == nil {
-			return session, nil
-		} else {
-			log.Printf("Failed to Open QUIC Session: %s\n    Retrying...\n", err)
+// failedCheckConnection method handles the logic for switching between diverter and proxy (or viceversa if PreferProxy true)
+// after half connection tries are failed, and stopping altogether if retries are exhausted
+func failedCheckConnection() bool {
+	maxRetries := ClientConfiguration.MaxConnectionRetries
+	preferProxy := ClientConfiguration.PreferProxy
+
+	shared.ScaleUpTimeout()
+
+	keepRedirectionRetries--
+	if preferProxy {
+		// First half of tries with proxy, then diverter, then stop
+		if shared.UsingProxy && keepRedirectionRetries < maxRetries/2 {
+			stopProxy()
+			logger.Info("Connection failed and half retries exhausted, trying with diverter\n")
+			return !initDiverter()
 		}
+		if keepRedirectionRetries > 0 {
+			logger.Info("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
+			//stopProxy()
+			initProxy()
+			return false
+		}
+
+		logger.Info("Connection failed and retries exhausted, redirection stopped\n")
+		stopDiverter()
+		return true
 	}
 
-	log.Printf("Max Retries Exceeded. Unable to Open QUIC Session: %s\n", err)
-	return nil, err
+	// First half of tries with diverter, then proxy, then stop
+	if !shared.UsingProxy && keepRedirectionRetries < maxRetries/2 {
+		stopDiverter()
+		logger.Info("Connection failed and half retries exhausted, trying with proxy\n")
+		initProxy()
+		return false
+	}
+	if keepRedirectionRetries > 0 {
+		logger.Info("Connection failed, keeping redirection active (retries left: %d)\n", keepRedirectionRetries)
+		stopDiverter()
+		initDiverter()
+		return false
+	}
+
+	logger.Info("Connection failed and retries exhausted, redirection stopped\n")
+	stopProxy()
+	return true
+}
+
+// gatewayStatusCheck wraps the request for the /echo API to the api server
+func gatewayStatusCheck(localAddr, apiAddr string, apiPort int) (bool, *api.EchoResponse) {
+	if response := api.RequestEcho(localAddr, apiAddr, apiPort, true); response != nil {
+		logger.Info("Gateway Echo OK\n")
+		return true, response
+	}
+	logger.Info("Gateway Echo FAILED\n")
+	return false, nil
+}
+
+// clientStatisticsUpdate wraps the request for the /statistics/data API to the api server, and updates the local statistics
+// with the ones received
+func clientStatisticsUpdate(localAddr, apiAddr string, apiPort int, publicAddress string) bool {
+	response := api.RequestStatistics(localAddr, apiAddr, apiPort, publicAddress)
+	if response == nil {
+		logger.Info("Statistics update failed, resetting connection status\n")
+		return false
+	}
+
+	for _, stat := range response.Data {
+		value, err := strconv.ParseFloat(stat.Value, 64)
+		if err != nil {
+			continue
+		}
+		api.Statistics.SetCounter(value, stat.Name)
+	}
+	return true
+}
+
+// validateConfiguration method handles the checking of the configuration values provided in the configuration files
+// for the client mode
+func validateConfiguration() {
+	shared.AssertParamIP("listen host", shared.QPepConfig.ListenHost)
+	shared.AssertParamPort("listen port", shared.QPepConfig.ListenPort)
+
+	// copy values for client configuration
+	ClientConfiguration.GatewayHost = shared.QPepConfig.GatewayHost
+	ClientConfiguration.GatewayPort = shared.QPepConfig.GatewayPort
+	ClientConfiguration.APIPort = shared.QPepConfig.GatewayAPIPort
+	ClientConfiguration.ListenHost, ClientConfiguration.RedirectedInterfaces = shared.GetDefaultLanListeningAddress(
+		shared.QPepConfig.ListenHost, shared.QPepConfig.GatewayHost)
+	ClientConfiguration.ListenPort = shared.QPepConfig.ListenPort
+	ClientConfiguration.MaxConnectionRetries = shared.QPepConfig.MaxConnectionRetries
+	ClientConfiguration.MultiStream = shared.QPepConfig.MultiStream
+	ClientConfiguration.WinDivertThreads = shared.QPepConfig.WinDivertThreads
+	ClientConfiguration.PreferProxy = shared.QPepConfig.PreferProxy
+	ClientConfiguration.Verbose = shared.QPepConfig.Verbose
+
+	// panic if configuration is inconsistent
+	shared.AssertParamIP("gateway host", ClientConfiguration.GatewayHost)
+	shared.AssertParamPort("gateway port", ClientConfiguration.GatewayPort)
+
+	shared.AssertParamPort("api port", ClientConfiguration.APIPort)
+
+	shared.AssertParamNumeric("max connection retries", ClientConfiguration.MaxConnectionRetries, 1, 300)
+	shared.AssertParamNumeric("max diverter threads", ClientConfiguration.WinDivertThreads, 1, 32)
+
+	shared.AssertParamHostsDifferent("hosts", ClientConfiguration.GatewayHost, ClientConfiguration.ListenHost)
+	shared.AssertParamPortsDifferent("ports", ClientConfiguration.GatewayPort,
+		ClientConfiguration.ListenPort, ClientConfiguration.APIPort)
+
+	shared.AssertParamNumeric("auto-redirected interfaces", len(ClientConfiguration.RedirectedInterfaces), 0, 256)
+
+	// validation ok
+	logger.Info("Client configuration validation OK\n")
 }
