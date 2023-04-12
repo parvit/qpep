@@ -31,7 +31,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          rm -rf *
+          Remove-Item -Recurse -Force
           ls
 
   run-server:
