@@ -1,0 +1,32 @@
+name: PerformanceTests
+
+run-name: Performance Testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-client:
+    runs-on: vm-client
+    steps:
+      - name: Build
+        run: |
+          echo Check Client!
+          sleep 10
+
+  run-server:
+    runs-on: vm-server
+    steps:
+      - name: Build
+        run: |
+          echo Check Server!
+          sleep 10
+
+  check:
+    needs: [ run-client, run-server ]
+    runs-on: vm-server
+    steps:
+      - name: Final Check
+        run: |
+          echo Check Results!
+          sleep 2
