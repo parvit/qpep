@@ -14,20 +14,47 @@ jobs:
   run-client:
     runs-on: vm-client
     steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
       - name: Build
+        shell: powershell
         run: |
           echo Check Client!
+          ls
           docker version
           sleep 2
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf *
+          ls
 
   run-server:
     runs-on: vm-server
     steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
       - name: Build
         run: |
           echo Check Server!
+          ls
           docker version
           sleep 2
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf *
+          ls
 
   check:
     needs: [ run-client, run-server ]
