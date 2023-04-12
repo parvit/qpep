@@ -4,6 +4,11 @@ run-name: Performance Testing
 
 on:
   workflow_dispatch:
+    gateway_address:
+      description: 'address for client to use as gateway'
+      type: string
+      default: 35.163.142.7
+      required: true
 
 jobs:
   run-client:
@@ -12,7 +17,8 @@ jobs:
       - name: Build
         run: |
           echo Check Client!
-          sleep 10
+          docker version
+          sleep 2
 
   run-server:
     runs-on: vm-server
@@ -20,7 +26,8 @@ jobs:
       - name: Build
         run: |
           echo Check Server!
-          sleep 10
+          docker version
+          sleep 2
 
   check:
     needs: [ run-client, run-server ]
