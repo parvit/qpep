@@ -1,0 +1,28 @@
+
+# server
+gateway: 127.0.0.1
+port: 1443
+apiport: 444
+listenaddress: 192.168.1.52
+listenport: 9443
+
+# broker settings
+analytics:
+  enabled: true
+  topic: /qpep
+  address: MQTT
+  port: 1883
+  protocol: tcp
+
+# default
+acks: 10
+ackdelay: 25
+congestion: 4
+decimate: 4
+decimatetime: 100
+maxretries: 100
+multistream: true
+verbose: false
+preferproxy: true
+varackdelay: 0
+threads: 4
