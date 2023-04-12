@@ -13,8 +13,8 @@ on:
         type: boolean
         default: false
         required: true
-  push:
-    branches: [ "main", "testing-*", "issue*" ]
+#  push:
+#    branches: [ "main", "testing-*", "issue*" ]
 
 run-name: Code integration [${{ github.inputs.x86_version }}][${{ github.inputs.do_tests }}] - ${{ github.head_ref }}.${{ github.sha }}
 
