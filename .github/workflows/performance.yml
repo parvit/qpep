@@ -26,6 +26,7 @@ jobs:
       - name: Prepare
         run: |
           mkdir config/
+          echo sed -E 's/%QPEP_GATEWAY%/$REMOTE_GATEWAY"/'  -E 's/%QPEP_ADDRESS%/LISTEN_ADDRESS"/' docker/client-env/qpep.yml.tpl > config/qpep.yml
           sed -E 's/%QPEP_GATEWAY%/$REMOTE_GATEWAY"/'  -E 's/%QPEP_ADDRESS%/LISTEN_ADDRESS"/' docker/client-env/qpep.yml.tpl > config/qpep.yml
 
       - name: Build Client
@@ -65,7 +66,7 @@ jobs:
           docker version
           cd docker/
           pushd build-linux/
-          docker build -t project-faster/qpep_server
+          docker build -t project-faster/qpep_server .
           popd
           pushd performance-env/
           docker compose up -d
