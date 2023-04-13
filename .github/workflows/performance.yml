@@ -14,8 +14,8 @@ jobs:
   run-client:
     runs-on: vm-client
     env:
-      - LISTEN_ADDRESS: 127.0.0.1
-      - REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
+      LISTEN_ADDRESS: 127.0.0.1
+      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up Go
@@ -46,11 +46,11 @@ jobs:
   run-server:
     runs-on: vm-server
     env:
-      - CONTAINERS_SUBNET: 192.168.1.0/24
-      - MQTT_ADDRESS: 192.168.1.51
-      - LOGSTASH_ADDRESS: 192.168.1.52
-      - LISTEN_ADDRESS: 127.0.0.1
-      - REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
+      CONTAINERS_SUBNET: 192.168.1.0/24
+      MQTT_ADDRESS: 192.168.1.51
+      LOGSTASH_ADDRESS: 192.168.1.52
+      LISTEN_ADDRESS: 127.0.0.1
+      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up Go
