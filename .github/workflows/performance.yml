@@ -27,7 +27,7 @@ jobs:
         shell: powershell
         run: |
           mkdir config/
-          (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > > config/qpep.yml
+          (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
           (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace 'LISTEN_ADDRESS' > config/qpep.yml
 
       - name: Build Client
