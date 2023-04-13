@@ -31,8 +31,8 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          Remove-Item -Recurse -Force -Path .
           ls
+          Remove-Item -Recurse -Force -Path .*
 
   run-server:
     runs-on: vm-server
