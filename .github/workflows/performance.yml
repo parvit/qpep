@@ -24,22 +24,26 @@ jobs:
           go-version: 1.18
 
       - name: Prepare
+        shell: bash
         run: |
           mkdir config/
           echo sed -E 's/%QPEP_GATEWAY%/$REMOTE_GATEWAY"/'  -E 's/%QPEP_ADDRESS%/LISTEN_ADDRESS"/' docker/client-env/qpep.yml.tpl > config/qpep.yml
           sed -E 's/%QPEP_GATEWAY%/$REMOTE_GATEWAY"/'  -E 's/%QPEP_ADDRESS%/LISTEN_ADDRESS"/' docker/client-env/qpep.yml.tpl > config/qpep.yml
 
       - name: Build Client
+        shell: bash
         run: |
           go build -v -o qpep.exe
 
       - name: Run Client
+        shell: bash
         run: |
           setsid ./qpep.exe &> /dev/null
           sleep 10
 
       - name: Cleanup
         if: always()
+        shell: bash
         run: |
           kill -s 9 $(pidof -s qpep.exe)
           rm -rf ${{ github.workspace }}/*
