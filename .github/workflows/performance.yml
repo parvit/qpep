@@ -32,7 +32,7 @@ jobs:
         if: always()
         run: |
           ls
-          Remove-Item -Recurse -Force -Path .*
+          Remove-Item -Recurse -Force -Path ./*
           echo -----
           ls
 
@@ -55,10 +55,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          ls
           rm -rf *
-          echo -----
-          ls
 
   check:
     needs: [ run-client, run-server ]
