@@ -33,6 +33,8 @@ jobs:
         run: |
           ls
           Remove-Item -Recurse -Force -Path .*
+          echo -----
+          ls
 
   run-server:
     runs-on: vm-server
@@ -53,7 +55,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
+          ls
           rm -rf *
+          echo -----
           ls
 
   check:
