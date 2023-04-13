@@ -1,12 +1,19 @@
 # Performance data receiver
 
+# set environment variables before running:
+# CONTAINERS_SUBNET
+# MQTT_ADDRESS
+# LISTEN_ADDRESS
+# REMOTE_GATEWAY
+# LOGSTASH_ADDRESS
+
 version: "1.0"
 services:
   collector:
     user: root
     extra_hosts:
-      - "MQTT:192.168.1.50"
-      - "LOGSTASH:192.168.1.51"
+      - "MQTT:${MQTT_ADDRESS}"
+      - "LOGSTASH:${LOGSTASH_ADDRESS}"
     ports:
       - target: 5044
         published: 5044
@@ -16,7 +23,7 @@ services:
       default:
       outside:
         ipv4_address:
-          192.168.1.51
+          "${LOGSTASH_ADDRESS}"
     environment:
       - ELASTIC_CONTAINER=false
     build:
@@ -36,8 +43,8 @@ services:
       context: ./mosquitto
       dockerfile: Dockerfile
     extra_hosts:
-      - "MQTT:192.168.1.50"
-      - "LOGSTASH:192.168.1.51"
+      - "MQTT:${MQTT_ADDRESS}"
+      - "LOGSTASH:${LOGSTASH_ADDRESS}"
     ports:
       - target: 1883
         published: 1883
@@ -47,18 +54,22 @@ services:
       default:
       outside:
         ipv4_address:
-          192.168.1.50
+          "${MQTT_ADDRESS}"
     volumes:
       - ./mosquitto/mosquitto.conf:/etc/mosquitto/mosquitto.conf
 
   server:
-    image: "project-faster/qpep_linux"
+    image: "project-faster/qpep_server"
     depends_on:
       - queue
       - collector
+    extra_hosts:
+      - "MQTT:${MQTT_ADDRESS}"
+      - "QPEP_GATEWAY:${REMOTE_GATEWAY}"
+      - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
     ports:
-      - target: 1445
-        published: 1445
+      - target: 1443
+        published: 1443
         protocol: udp
         mode: host
     volumes:
@@ -73,4 +84,4 @@ networks:
     ipam:
       driver: default
       config:
-        - subnet: 192.168.1.0/24
+        - subnet: "${CONTAINERS_SUBNET}" # eg. 192.168.1.0/24
