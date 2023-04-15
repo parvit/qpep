@@ -9,7 +9,7 @@ on:
         default: 192.168.1.50
         required: true
 
-run-name: Performance Testing
+run-name: Performance Testing - ${{ github.inputs.gateway_address }}
 
 jobs:
   run-client:
@@ -58,48 +58,48 @@ jobs:
         run: |
           Remove-Item -Path ${{ github.workspace }}/*
 
-  run-server:
-    runs-on: vm-server
-    env:
-      CONTAINERS_SUBNET: 192.168.1.0/24
-      MQTT_ADDRESS: 192.168.1.51
-      LOGSTASH_ADDRESS: 192.168.1.52
-      LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
-      - name: Build Server
-        run: |
-          echo Check Server!
-          ls
-          docker version
-          cd docker/
-          pushd build-linux/
-          docker build -t project-faster/qpep_server .
-          popd
-          pushd server-env/
-          docker compose up -d
-          popd
-          sleep 2
-
-      - name: Cleanup
-        if: always()
-        run: |
-          cd docker/build-linux/
-          docker compose down -v
-          cd ../../
-          rm -rf ${{ github.workspace }}/*
-
-  check:
-    needs: [ run-client, run-server ]
-    runs-on: vm-server
-    steps:
-      - name: Final Check
-        run: |
-          echo Check Results!
-          sleep 2
+#  run-server:
+#    runs-on: vm-server
+#    env:
+#      CONTAINERS_SUBNET: 192.168.1.0/24
+#      MQTT_ADDRESS: 192.168.1.51
+#      LOGSTASH_ADDRESS: 192.168.1.52
+#      LISTEN_ADDRESS: 127.0.0.1
+#      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: Set up Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: 1.18
+#
+#      - name: Build Server
+#        run: |
+#          echo Check Server!
+#          ls
+#          docker version
+#          cd docker/
+#          pushd build-linux/
+#          docker build -t project-faster/qpep_server .
+#          popd
+#          pushd server-env/
+#          docker compose up -d
+#          popd
+#          sleep 2
+#
+#      - name: Cleanup
+#        if: always()
+#        run: |
+#          cd docker/build-linux/
+#          docker compose down -v
+#          cd ../../
+#          rm -rf ${{ github.workspace }}/*
+#
+#  check:
+#    needs: [ run-client, run-server ]
+#    runs-on: vm-server
+#    steps:
+#      - name: Final Check
+#        run: |
+#          echo Check Results!
+#          sleep 2
