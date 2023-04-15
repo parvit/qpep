@@ -14,8 +14,6 @@ run-name: Performance Testing - ${{ inputs.gateway_address }}
 jobs:
   run-client:
     runs-on: vm-client
-    workspace:
-      clean: all
     env:
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
@@ -66,8 +64,6 @@ jobs:
 
 #  run-server:
 #    runs-on: vm-server
-#    workspace:
-#      clean: all
 #    env:
 #      CONTAINERS_SUBNET: 192.168.1.0/24
 #      MQTT_ADDRESS: 192.168.1.51
