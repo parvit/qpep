@@ -63,7 +63,7 @@ jobs:
         if: always()
         shell: powershell
         run: |
-          Remove-Item -Path "${{ github.workspace }}"
+          Remove-Item -Path "${{ github.workspace }}"\*
 
 #  run-server:
 #    runs-on: vm-server
