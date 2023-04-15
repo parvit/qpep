@@ -9,14 +9,14 @@ on:
         default: 192.168.1.50
         required: true
 
-run-name: Performance Testing - ${{ github.inputs.gateway_address }}
+run-name: Performance Testing - ${{ github.input.gateway_address }}
 
 jobs:
   run-client:
     runs-on: vm-client
     env:
       LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
+      REMOTE_GATEWAY: ${{ github.input.gateway_address }}
     steps:
 #      - uses: actions/checkout@v3
 #      - name: Set up Go
@@ -27,7 +27,7 @@ jobs:
       - name: Prepare
         shell: powershell
         run: |
-          New-Item -Path . -Name "config" -ItemType "directory"
+          New-Item -Path . -Name "config" -ItemType "directory" -Force
           (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
           (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace '$LISTEN_ADDRESS' > config/qpep.yml
           Get-Content -Path ./config/qpep.yml
