@@ -20,8 +20,9 @@ jobs:
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
     steps:
-      - uses: AutoModality/action-clean@v1
       - uses: actions/checkout@v3
+        with:
+          clean: true
 
 #      - name: Set up Go
 #        uses: actions/setup-go@v3
