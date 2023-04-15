@@ -26,9 +26,10 @@ jobs:
       - name: Prepare
         shell: powershell
         run: |
-          mkdir config/
+          New-Item -Path . -Name "config" -ItemType "directory"
           (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
           (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace '$LISTEN_ADDRESS' > config/qpep.yml
+          Get-Content -Path ./config/qpep.yml
 
       - name: Build Client
         shell: powershell
@@ -52,8 +53,9 @@ jobs:
 
       - name: Cleanup
         if: always()
+        shell: powershell
         run: |
-          rm -rf ${{ github.workspace }}/*
+          Remove-Item -Path ${{ github.workspace }}/*
 
   run-server:
     runs-on: vm-server
