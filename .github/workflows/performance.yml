@@ -16,7 +16,7 @@ jobs:
     runs-on: vm-client
     env:
       LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ input.gateway_address }}
+      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
     steps:
 #      - uses: actions/checkout@v3
 #      - name: Set up Go
