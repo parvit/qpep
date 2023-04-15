@@ -1,0 +1,87 @@
+# Performance data receiver
+
+# set environment variables before running:
+# CONTAINERS_SUBNET
+# MQTT_ADDRESS
+# LISTEN_ADDRESS
+# REMOTE_GATEWAY
+# LOGSTASH_ADDRESS
+
+version: "1.0"
+services:
+  collector:
+    user: root
+    extra_hosts:
+      - "MQTT:${MQTT_ADDRESS}"
+      - "LOGSTASH:${LOGSTASH_ADDRESS}"
+    ports:
+      - target: 5044
+        published: 5044
+        protocol: tcp
+        mode: host
+    networks:
+      default:
+      outside:
+        ipv4_address:
+          "${LOGSTASH_ADDRESS}"
+    environment:
+      - ELASTIC_CONTAINER=false
+    build:
+      context: ./logstash
+      dockerfile: Dockerfile
+    depends_on:
+      queue:
+        condition: service_started
+    volumes:
+      - ./logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml
+      - ./logstash/mqtt.conf:/usr/share/logstash/pipeline/mqtt.conf
+      - ./output/:/usr/share/logstash/output
+
+  queue:
+    image: "project-faster/mosquitto"
+    build:
+      context: ./mosquitto
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "MQTT:${MQTT_ADDRESS}"
+      - "LOGSTASH:${LOGSTASH_ADDRESS}"
+    ports:
+      - target: 1883
+        published: 1883
+        protocol: tcp
+        mode: host
+    networks:
+      default:
+      outside:
+        ipv4_address:
+          "${MQTT_ADDRESS}"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/etc/mosquitto/mosquitto.conf
+
+  server:
+    image: "project-faster/qpep_server"
+    depends_on:
+      - queue
+      - collector
+    extra_hosts:
+      - "MQTT:${MQTT_ADDRESS}"
+      - "QPEP_GATEWAY:${REMOTE_GATEWAY}"
+      - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
+    ports:
+      - target: 1443
+        published: 1443
+        protocol: udp
+        mode: host
+    volumes:
+      - ./server:/build/config
+    entrypoint:
+      - sh -c 'cd /build && ./qpep -server'
+
+
+networks:
+  outside:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: "${CONTAINERS_SUBNET}" # eg. 192.168.1.0/24
