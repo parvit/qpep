@@ -33,8 +33,8 @@ jobs:
           New-Item -Path . -Name "build" -ItemType "directory" -Force
           New-Item -Path . -Name "build/config" -ItemType "directory" -Force
           $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
-          $config = $config -replace '%QPEP_GATEWAY%',"$REMOTE_GATEWAY"
-          $config = $config -replace '%QPEP_ADDRESS%',"$LISTEN_ADDRESS"
+          $config = $config -replace '%QPEP_GATEWAY%',"${REMOTE_GATEWAY}"
+          $config = $config -replace '%QPEP_ADDRESS%',"${LISTEN_ADDRESS}"
           $config > ./build/config/qpep.yml
           Get-Content -Path ./build/config/qpep.yml
 
