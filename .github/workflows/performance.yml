@@ -17,18 +17,18 @@ jobs:
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
+#      - uses: actions/checkout@v3
+#      - name: Set up Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: 1.18.10
+#
       - name: Prepare
         shell: powershell
         run: |
           mkdir config/
           (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
-          (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace 'LISTEN_ADDRESS' > config/qpep.yml
+          (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace '$LISTEN_ADDRESS' > config/qpep.yml
 
       - name: Build Client
         shell: powershell
@@ -79,7 +79,7 @@ jobs:
           pushd build-linux/
           docker build -t project-faster/qpep_server .
           popd
-          pushd performance-env/
+          pushd server-env/
           docker compose up -d
           popd
           sleep 2
