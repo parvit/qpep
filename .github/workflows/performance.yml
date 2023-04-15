@@ -61,6 +61,8 @@ jobs:
         run: |
           Get-Process qpep | Stop-Process
 
+      - uses: rtCamp/action-cleanup@master
+
 #  run-server:
 #    runs-on: vm-server
 #    env:
@@ -70,7 +72,6 @@ jobs:
 #      LISTEN_ADDRESS: 127.0.0.1
 #      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
 #    steps:
-#      - uses: AutoModality/action-clean@v1
 #      - uses: actions/checkout@v3
 #
 #      - name: Set up Go
@@ -98,6 +99,8 @@ jobs:
 #          cd docker/build-linux/
 #          docker compose down -v
 #          cd ../../
+#
+#      - uses: rtCamp/action-cleanup@master
 #
 #  check:
 #    needs: [ run-client, run-server ]
