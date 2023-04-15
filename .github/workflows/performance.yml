@@ -18,6 +18,7 @@ jobs:
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
     steps:
+      - uses: AutoModality/action-clean@v1
       - uses: actions/checkout@v3
 
 #      - name: Set up Go
@@ -55,15 +56,10 @@ jobs:
           sleep 10
 
       - name: Stop Client
-        shell: powershell
-        run: |
-          Get-Process qpep | Stop-Process
-
-      - name: Cleanup
         if: always()
         shell: powershell
         run: |
-          Remove-Item -Path "${{ github.workspace }}\*"
+          Get-Process qpep | Stop-Process
 
 #  run-server:
 #    runs-on: vm-server
@@ -74,6 +70,7 @@ jobs:
 #      LISTEN_ADDRESS: 127.0.0.1
 #      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
 #    steps:
+#      - uses: AutoModality/action-clean@v1
 #      - uses: actions/checkout@v3
 #
 #      - name: Set up Go
@@ -101,7 +98,6 @@ jobs:
 #          cd docker/build-linux/
 #          docker compose down -v
 #          cd ../../
-#          rm -rf ${{ github.workspace }}/*
 #
 #  check:
 #    needs: [ run-client, run-server ]
