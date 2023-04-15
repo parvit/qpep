@@ -30,11 +30,13 @@ jobs:
       - name: Prepare
         shell: powershell
         run: |
-          New-Item -Path . -Name "config" -ItemType "directory" -Force
           New-Item -Path . -Name "build" -ItemType "directory" -Force
-          (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
-          (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace '$LISTEN_ADDRESS' > config/qpep.yml
-          Get-Content -Path ./config/qpep.yml
+          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
+          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
+          $config = $config -replace '%QPEP_GATEWAY%','$REMOTE_GATEWAY'
+          $config = $config -replace '%QPEP_ADDRESS%','$LISTEN_ADDRESS'
+          $config > ./build/config/qpep.yml
+          Get-Content -Path ./build/config/qpep.yml
 
       - name: Build Client
         shell: cmd
@@ -69,7 +71,7 @@ jobs:
 #      MQTT_ADDRESS: 192.168.1.51
 #      LOGSTASH_ADDRESS: 192.168.1.52
 #      LISTEN_ADDRESS: 127.0.0.1
-#      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
+#      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
 #    steps:
 #      - uses: actions/checkout@v3
 #
