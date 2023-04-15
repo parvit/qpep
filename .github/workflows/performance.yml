@@ -46,7 +46,7 @@ jobs:
         shell: powershell
         run: |
           Copy-Item "./windivert/x64/*" -Destination "./build"
-          Start-Process ./build/qpep.exe -WorkingDir "./build"
+          Start-Process "./build/qpep.exe" -WorkingDir "./build"
 
       - name: Run Tests
         shell: powershell
@@ -56,13 +56,13 @@ jobs:
       - name: Stop Client
         shell: powershell
         run: |
-          Stop-Process -Name "qpep.exe"
+          Get-Process qpep | Stop-Process
 
       - name: Cleanup
         if: always()
         shell: powershell
         run: |
-          Remove-Item -Path ${{ github.workspace }}/*
+          Remove-Item -Path "${{ github.workspace }}"
 
 #  run-server:
 #    runs-on: vm-server
