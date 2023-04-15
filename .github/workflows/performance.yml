@@ -1,14 +1,15 @@
 name: PerformanceTests
 
-run-name: Performance Testing
-
 on:
   workflow_dispatch:
-    gateway_address:
-      description: 'address for client to use as gateway'
-      type: string
-      default: 192.168.1.50
-      required: true
+    inputs:
+      gateway_address:
+        description: 'address for client to use as gateway'
+        type: string
+        default: 192.168.1.50
+        required: true
+
+run-name: Performance Testing
 
 jobs:
   run-client:
