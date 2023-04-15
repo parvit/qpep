@@ -18,7 +18,8 @@ jobs:
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
     steps:
-#      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
 #      - name: Set up Go
 #        uses: actions/setup-go@v3
 #        with:
@@ -74,6 +75,7 @@ jobs:
 #      REMOTE_GATEWAY: ${{ github.inputs.gateway_address }}
 #    steps:
 #      - uses: actions/checkout@v3
+#
 #      - name: Set up Go
 #        uses: actions/setup-go@v3
 #        with:
