@@ -1,14 +1,15 @@
 name: PerformanceTests
 
-run-name: Performance Testing
-
 on:
   workflow_dispatch:
-    gateway_address:
-      description: 'address for client to use as gateway'
-      type: string
-      default: 192.168.1.50
-      required: true
+    inputs:
+      gateway_address:
+        description: 'address for client to use as gateway'
+        type: string
+        default: 192.168.1.50
+        required: true
+
+run-name: Performance Testing - ${{ github.inputs.gateway_address }}
 
 jobs:
   run-client:
@@ -26,7 +27,7 @@ jobs:
       - name: Prepare
         shell: powershell
         run: |
-          New-Item -Path . -Name "config" -ItemType "directory"
+          New-Item -Path . -Name "config" -ItemType "directory" -Force
           (Get-Content -Path ./docker/client-env/qpep.yml.tpl) -match '%QPEP_GATEWAY%' -replace '$REMOTE_GATEWAY' > config/qpep.yml
           (Get-Content -Path ./config/qpep.yml) -match '%QPEP_ADDRESS%' -replace '$LISTEN_ADDRESS' > config/qpep.yml
           Get-Content -Path ./config/qpep.yml
