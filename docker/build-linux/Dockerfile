@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+
 FROM debian:latest
 ENV HTTP_PROXY ""
 ENV HTTPS_PROXY ""

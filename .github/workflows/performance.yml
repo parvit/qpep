@@ -16,7 +16,7 @@ on:
       mqtt_address:
         description: 'serverside address for mqtt instance'
         type: string
-        default: 192.168.1.51
+        default: 192.168.1.52
         required: true
       subnet:
         description: 'subnet for serverside addresses'
