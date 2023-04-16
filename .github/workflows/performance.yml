@@ -8,6 +8,11 @@ on:
         type: integer
         default: 0
         required: true
+      connection_delay_device:
+        description: 'serverside network device to set delay on'
+        type: string
+        default: enp0s8
+        required: true
       gateway_address:
         description: 'address for client to use as gateway'
         type: string
@@ -37,6 +42,10 @@ jobs:
 #    env:
 #      LISTEN_ADDRESS: 127.0.0.1
 #      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
+#    strategy:
+#      matrix:
+#        timeout_sec: [ 60 ]
+#        connections_number: [ 1, 4, 8, 16 ]
 #    steps:
 #      - uses: actions/checkout@v3
 #        with:
@@ -76,66 +85,66 @@ jobs:
 #      - name: Run Tests
 #        shell: powershell
 #        run: |
-#          sleep 10
+#          cd speedtests/
+#          go test speed_test.go -test.timeout 10m -test_timeout ${{ matrix.timeout_sec }} -connections_num ${{ matrix.connections_num }}
 #
 #      - name: Stop Client
 #        if: always()
 #        shell: powershell
 #        run: |
 #          Get-Process qpep | Stop-Process
-
-  run-server-matrix:
+#
+  run-server:
     runs-on: vm-server
-    strategy:
-      matrix:
-        timeout_sec: [60]
-        connections_number: [1, 4, 8, 16]
+    env:
+      CONTAINERS_SUBNET: ${{ inputs.subnet }}
+      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
+      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
+      LISTEN_ADDRESS: 127.0.0.1
+      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
     steps:
-      - name: Execute
-        run: |
-          echo timeout: ${{ matrix.timeout_sec }}
-          echo connections_number: ${{ matrix.connections_number }}
-          echo connection_delay: ${{ inputs.connection_delay_ms }}
+      - uses: actions/checkout@v3
 
-#  run-server:
-#    runs-on: vm-server
-#    env:
-#      CONTAINERS_SUBNET: ${{ inputs.subnet }}
-#      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
-#      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
-#      LISTEN_ADDRESS: 127.0.0.1
-#      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
-#        with:
-#          go-version: 1.18
-#
-#      - name: Build Server
-#        run: |
-#          echo Check Server!
-#          ls
-#          docker version
-#          cd docker/
-#          pushd build-linux/
-#          docker build -t project-faster/qpep_server .
-#          popd
-#          pushd server-env/
-#          docker compose up -d
-#          popd
-#
-#      - name: Wait Tests
-#        run: |
-#          sleep 10
-#
-#      - name: Cleanup
-#        if: always()
-#        run: |
-#          cd docker/server-env/
-#          docker compose down -v
-#          docker image rm project-faster/qpep_server || true
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: Set connection delay
+        run: |
+          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
+
+      - name: Build Server
+        run: |
+          docker version
+          cd docker/
+          pushd build-linux/
+          docker build -t project-faster/qpep_server .
+          popd
+
+      - name: Run Server
+        run: |
+          pushd server-env/
+          pushd http-data/
+          bash gen-local-data.sh
+          popd
+          docker compose up -d
+
+      - name: Wait Tests
+        run: |
+          sleep 10
+          wget http://localhost:8080/target_1M.dat
+          wget http://localhost:8080/target_10M.dat
+          wget http://localhost:8080/target_100M.dat
+          sleep 10
+
+      - name: Cleanup
+        if: always()
+        run: |
+          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
+          cd docker/server-env/
+          docker compose down -v
+          docker image rm project-faster/qpep_server || true
 
 #  check:
 #    needs: [ run-client, run-server ]

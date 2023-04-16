@@ -77,6 +77,16 @@ services:
     command:
       - sh -c 'cd /build && ./qpep -server'
 
+  server-httpd:
+    image: "httpd:2.4"
+    hostname: HTTPD
+    volumes:
+      - "./http-data:/usr/local/apache2/htdocs/"
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
 
 networks:
   outside:
