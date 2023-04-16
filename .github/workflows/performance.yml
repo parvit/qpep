@@ -3,6 +3,11 @@ name: PerformanceTests
 on:
   workflow_dispatch:
     inputs:
+      connection_delay_ms:
+        description: 'connection delay in milliseconds set on the server'
+        type: integer
+        default: 0
+        required: true
       gateway_address:
         description: 'address for client to use as gateway'
         type: string
@@ -83,15 +88,14 @@ jobs:
     runs-on: vm-server
     strategy:
       matrix:
-        timeout_sec: [60, 600]
-        connections_number: [1, 8, 16]
-        connection_delay: [0, 200, 400, 800]
+        timeout_sec: [60]
+        connections_number: [1, 4, 8, 16]
     steps:
       - name: Execute
         run: |
           echo timeout: ${{ matrix.timeout_sec }}
           echo connections_number: ${{ matrix.connections_number }}
-          echo connection_delay: ${{ matrix.connection_delay }}
+          echo connection_delay: ${{ inputs.connection_delay_ms }}
 
 #  run-server:
 #    runs-on: vm-server
