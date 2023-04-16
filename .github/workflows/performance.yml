@@ -124,7 +124,7 @@ jobs:
 
       - name: Run Server
         run: |
-          pushd server-env/
+          cd docker/server-env/
           pushd http-data/
           bash gen-local-data.sh
           popd
