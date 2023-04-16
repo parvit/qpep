@@ -115,9 +115,9 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          cd docker/build-linux/
+          cd docker/server-env/
           docker compose down -v
-          docker image rm project-faster/qpep_server
+          docker image rm project-faster/qpep_server || true
 
 #  check:
 #    needs: [ run-client, run-server ]
