@@ -74,7 +74,7 @@ services:
         mode: host
     volumes:
       - ./server:/build/config
-    entrypoint:
+    command:
       - sh -c 'cd /build && ./qpep -server'
 
 
