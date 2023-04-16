@@ -82,7 +82,7 @@ jobs:
   run-server:
     runs-on: vm-server
     env:
-      CONTAINERS_SUBNET: ${{ inputs.containers_subnet }}
+      CONTAINERS_SUBNET: ${{ inputs.subnet }}
       MQTT_ADDRESS: ${{ inputs.mqtt_address }}
       LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
       LISTEN_ADDRESS: 127.0.0.1
@@ -117,6 +117,7 @@ jobs:
         run: |
           cd docker/build-linux/
           docker compose down -v
+          docker image rm project-faster/qpep_server
 
 #  check:
 #    needs: [ run-client, run-server ]
