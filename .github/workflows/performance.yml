@@ -8,101 +8,116 @@ on:
         type: string
         default: 192.168.1.50
         required: true
+      logstash_address:
+        description: 'serverside address for logstash instance'
+        type: string
+        default: 192.168.1.51
+        required: true
+      mqtt_address:
+        description: 'serverside address for mqtt instance'
+        type: string
+        default: 192.168.1.51
+        required: true
+      subnet:
+        description: 'subnet for serverside addresses'
+        type: string
+        default: 192.168.1.0/24
+        required: true
 
 run-name: Performance Testing - ${{ inputs.gateway_address }}
 
 jobs:
-  run-client:
-    runs-on: vm-client
-    env:
-      LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          clean: true
-
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
-#        with:
-#          go-version: 1.18.10
-#
-      - name: Prepare
-        shell: powershell
-        run: |
-          New-Item -Path . -Name "build" -ItemType "directory" -Force
-          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
-          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
-          $config = $config -replace '%QPEP_GATEWAY%',"${REMOTE_GATEWAY}"
-          $config = $config -replace '%QPEP_ADDRESS%',"${LISTEN_ADDRESS}"
-          $config > ./build/config/qpep.yml
-          Get-Content -Path ./build/config/qpep.yml
-
-      - name: Build Client
-        shell: cmd
-        run: |
-          set CGO_ENABLED=1
-          set GOOS=windows
-          set GOHOSTARCH=amd64
-          set GOHOSTOS=windows
-          go build -v -o build/qpep.exe
-
-      - name: Run Client
-        shell: powershell
-        run: |
-          Copy-Item "./windivert/x64/*" -Destination "./build"
-          Start-Process "./build/qpep.exe" -WorkingDir "./build"
-
-      - name: Run Tests
-        shell: powershell
-        run: |
-          sleep 10
-
-      - name: Stop Client
-        if: always()
-        shell: powershell
-        run: |
-          Get-Process qpep | Stop-Process
-
-#  run-server:
-#    runs-on: vm-server
+#  run-client:
+#    runs-on: vm-client
 #    env:
-#      CONTAINERS_SUBNET: 192.168.1.0/24
-#      MQTT_ADDRESS: 192.168.1.51
-#      LOGSTASH_ADDRESS: 192.168.1.52
 #      LISTEN_ADDRESS: 127.0.0.1
 #      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
 #    steps:
 #      - uses: actions/checkout@v3
-#
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
 #        with:
-#          go-version: 1.18
+#          clean: true
 #
-#      - name: Build Server
+##      - name: Set up Go
+##        uses: actions/setup-go@v3
+##        with:
+##          go-version: 1.18.10
+##
+#      - name: Prepare
+#        shell: powershell
 #        run: |
-#          echo Check Server!
-#          ls
-#          docker version
-#          cd docker/
-#          pushd build-linux/
-#          docker build -t project-faster/qpep_server .
-#          popd
-#          pushd server-env/
-#          docker compose up -d
-#          popd
-#          sleep 2
+#          New-Item -Path . -Name "build" -ItemType "directory" -Force
+#          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
+#          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
+#          $config = $config -replace '%QPEP_GATEWAY%',"${REMOTE_GATEWAY}"
+#          $config = $config -replace '%QPEP_ADDRESS%',"${LISTEN_ADDRESS}"
+#          $config > ./build/config/qpep.yml
+#          Get-Content -Path ./build/config/qpep.yml
 #
-#      - name: Cleanup
+#      - name: Build Client
+#        shell: cmd
+#        run: |
+#          set CGO_ENABLED=1
+#          set GOOS=windows
+#          set GOHOSTARCH=amd64
+#          set GOHOSTOS=windows
+#          go build -v -o build/qpep.exe
+#
+#      - name: Run Client
+#        shell: powershell
+#        run: |
+#          Copy-Item "./windivert/x64/*" -Destination "./build"
+#          Start-Process "./build/qpep.exe" -WorkingDir "./build"
+#
+#      - name: Run Tests
+#        shell: powershell
+#        run: |
+#          sleep 10
+#
+#      - name: Stop Client
 #        if: always()
+#        shell: powershell
 #        run: |
-#          cd docker/build-linux/
-#          docker compose down -v
-#          cd ../../
-#
-#      - uses: rtCamp/action-cleanup@master
-#
+#          Get-Process qpep | Stop-Process
+
+  run-server:
+    runs-on: vm-server
+    env:
+      CONTAINERS_SUBNET: ${{ inputs.containers_subnet }}
+      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
+      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
+      LISTEN_ADDRESS: 127.0.0.1
+      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: Build Server
+        run: |
+          echo Check Server!
+          ls
+          docker version
+          cd docker/
+          pushd build-linux/
+          docker build -t project-faster/qpep_server .
+          popd
+          pushd server-env/
+          docker compose up -d
+          popd
+
+      - name: Wait Tests
+        run: |
+          sleep 10
+
+      - name: Cleanup
+        if: always()
+        run: |
+          cd docker/build-linux/
+          docker compose down -v
+
 #  check:
 #    needs: [ run-client, run-server ]
 #    runs-on: vm-server
