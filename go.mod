@@ -28,7 +28,7 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/nyaosorg/go-windows-dbg v0.0.0-20210914123807-2acba179a4e5
 	github.com/segmentio/fasthash v1.0.3
-	github.com/stretchr/testify v1.5.1
+	github.com/stretchr/testify v1.8.2
 )
 
 require (
@@ -53,6 +53,7 @@ require (
 	github.com/quic-go/qtls-go1-18 v0.2.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.2.0 // indirect
 	github.com/quic-go/qtls-go1-20 v0.1.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20230206171751-46f607a40771 // indirect
 	golang.org/x/mod v0.8.0 // indirect

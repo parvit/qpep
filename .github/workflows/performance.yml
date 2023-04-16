@@ -79,45 +79,59 @@ jobs:
 #        run: |
 #          Get-Process qpep | Stop-Process
 
-  run-server:
+  run-server-matrix:
     runs-on: vm-server
-    env:
-      CONTAINERS_SUBNET: ${{ inputs.subnet }}
-      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
-      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
-      LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
+    strategy:
+      matrix:
+        timeout_sec: [60, 600]
+        connections_number: [1, 8, 16]
+        connection_delay: [0, 200, 400, 800]
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
-      - name: Build Server
+      - name: Execute
         run: |
-          echo Check Server!
-          ls
-          docker version
-          cd docker/
-          pushd build-linux/
-          docker build -t project-faster/qpep_server .
-          popd
-          pushd server-env/
-          docker compose up -d
-          popd
+          echo timeout: ${{ matrix.timeout_sec }}
+          echo connections_number: ${{ matrix.connections_number }}
+          echo connection_delay: ${{ matrix.connection_delay }}
 
-      - name: Wait Tests
-        run: |
-          sleep 10
-
-      - name: Cleanup
-        if: always()
-        run: |
-          cd docker/server-env/
-          docker compose down -v
-          docker image rm project-faster/qpep_server || true
+#  run-server:
+#    runs-on: vm-server
+#    env:
+#      CONTAINERS_SUBNET: ${{ inputs.subnet }}
+#      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
+#      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
+#      LISTEN_ADDRESS: 127.0.0.1
+#      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Set up Go
+#        uses: actions/setup-go@v3
+#        with:
+#          go-version: 1.18
+#
+#      - name: Build Server
+#        run: |
+#          echo Check Server!
+#          ls
+#          docker version
+#          cd docker/
+#          pushd build-linux/
+#          docker build -t project-faster/qpep_server .
+#          popd
+#          pushd server-env/
+#          docker compose up -d
+#          popd
+#
+#      - name: Wait Tests
+#        run: |
+#          sleep 10
+#
+#      - name: Cleanup
+#        if: always()
+#        run: |
+#          cd docker/server-env/
+#          docker compose down -v
+#          docker image rm project-faster/qpep_server || true
 
 #  check:
 #    needs: [ run-client, run-server ]
