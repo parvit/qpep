@@ -28,6 +28,11 @@ on:
         type: string
         default: 192.168.1.52
         required: true
+      httpd_address:
+        description: 'serverside address for httpd instance'
+        type: string
+        default: 192.168.1.53
+        required: true
       subnet:
         description: 'subnet for serverside addresses'
         type: string
@@ -102,6 +107,7 @@ jobs:
       LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
+      HTTPD_ADDRESS: ${{ inputs.httpd_address }}
     steps:
       - uses: actions/checkout@v3
 
