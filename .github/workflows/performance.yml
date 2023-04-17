@@ -139,9 +139,9 @@ jobs:
       - name: Wait Tests
         run: |
           sleep 10
-          wget --tries=2 http://localhost:8080/target_1M.dat
-          wget --tries=2 http://localhost:8080/target_10M.dat
-          wget --tries=2 http://localhost:8080/target_100M.dat
+          wget --tries=2 http://${HTTPD_ADDRESS}/target_1M.dat
+          wget --tries=2 http://${HTTPD_ADDRESS}/target_10M.dat
+          wget --tries=2 http://${HTTPD_ADDRESS}/target_100M.dat
           sleep 10
 
       - name: Cleanup
