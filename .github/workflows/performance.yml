@@ -154,6 +154,7 @@ jobs:
     runs-on: vm-data-server
     env:
       HTTPD_ADDRESS: ${{ inputs.httpd_address }}
+      CONTAINERS_SUBNET: ${{ inputs.subnet }}
 
     steps:
       - uses: actions/checkout@v3
