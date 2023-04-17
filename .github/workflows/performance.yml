@@ -165,7 +165,7 @@ jobs:
 
       - name: Start Server
         run: |
-          cd docker/server-env/
+          cd docker/server-data-env/
           docker compose up -d
 
   stop-data-server:
