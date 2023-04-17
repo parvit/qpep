@@ -1,4 +1,4 @@
-# Performance data receiver
+# Performance server
 
 # set environment variables before running:
 # CONTAINERS_SUBNET
@@ -6,7 +6,6 @@
 # LISTEN_ADDRESS
 # REMOTE_GATEWAY
 # LOGSTASH_ADDRESS
-# HTTPD_ADDRESS
 
 version: "1.0"
 services:
@@ -82,23 +81,6 @@ services:
       - ./server:/build/config
     command:
       - sh -c 'cd /build && ./qpep -server'
-
-  server-httpd:
-    image: "httpd:2.4"
-    extra_hosts:
-      - "HTTPD:${HTTPD_ADDRESS}"
-    ports:
-      - target: 80
-        published: 80
-        protocol: tcp
-        mode: host
-    networks:
-      default:
-      outside:
-        ipv4_address:
-          "${HTTPD_ADDRESS}"
-    volumes:
-      - "./http-data:/usr/local/apache2/htdocs/"
 
 networks:
   outside:

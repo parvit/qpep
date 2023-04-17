@@ -43,6 +43,7 @@ run-name: Performance Testing - ${{ inputs.gateway_address }}
 
 jobs:
 #  run-client:
+#    needs: [ start-data-server ]
 #    runs-on: vm-client
 #    env:
 #      LISTEN_ADDRESS: 127.0.0.1
@@ -100,6 +101,7 @@ jobs:
 #          Get-Process qpep | Stop-Process
 #
   run-server:
+    needs: [ start-data-server ]
     runs-on: vm-server
     env:
       CONTAINERS_SUBNET: ${{ inputs.subnet }}
@@ -107,7 +109,6 @@ jobs:
       LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
       LISTEN_ADDRESS: 127.0.0.1
       REMOTE_GATEWAY: ${{ inputs.gateway_address }}
-      HTTPD_ADDRESS: ${{ inputs.httpd_address }}
     steps:
       - uses: actions/checkout@v3
 
@@ -131,9 +132,6 @@ jobs:
       - name: Run Server
         run: |
           cd docker/server-env/
-          pushd http-data/
-          bash gen-local-data.sh
-          popd
           docker compose up -d
 
       - name: Wait Tests
@@ -152,8 +150,38 @@ jobs:
           docker compose down -v
           docker image rm project-faster/qpep_server || true
 
+  start-data-server:
+    runs-on: vm-data-server
+    env:
+      HTTPD_ADDRESS: ${{ inputs.httpd_address }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run Server
+        run: |
+          cd docker/server-env/
+          pushd http-data/
+          bash gen-local-data.sh
+
+      - name: Start Server
+        run: |
+          cd docker/server-env/
+          docker compose up -d
+
+  stop-data-server:
+    needs: [  run-server ] # run-client,
+    runs-on: vm-data-server
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Stop Server
+        run: |
+          cd docker/server-env/
+          docker compose down -v
+
 #  check:
-#    needs: [ run-client, run-server ]
+#    needs: [ stop-data-server, run-client, run-server ]
 #    runs-on: vm-server
 #    steps:
 #      - name: Final Check
