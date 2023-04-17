@@ -158,10 +158,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Run Server
+      - name: Generate test data
         run: |
-          cd docker/server-env/
-          pushd http-data/
+          cd docker/server-data-env/http-data/
           bash gen-local-data.sh
 
       - name: Start Server
