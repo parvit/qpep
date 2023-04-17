@@ -6,11 +6,20 @@
 # LISTEN_ADDRESS
 # REMOTE_GATEWAY
 # LOGSTASH_ADDRESS
+# HTTPD_ADDRESS
 
 version: "1.0"
 services:
   collector:
     user: root
+    environment:
+      - ELASTIC_CONTAINER=false
+    build:
+      context: ./logstash
+      dockerfile: Dockerfile
+    depends_on:
+      queue:
+        condition: service_started
     extra_hosts:
       - "MQTT:${MQTT_ADDRESS}"
       - "LOGSTASH:${LOGSTASH_ADDRESS}"
@@ -24,14 +33,6 @@ services:
       outside:
         ipv4_address:
           "${LOGSTASH_ADDRESS}"
-    environment:
-      - ELASTIC_CONTAINER=false
-    build:
-      context: ./logstash
-      dockerfile: Dockerfile
-    depends_on:
-      queue:
-        condition: service_started
     volumes:
       - ./logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml
       - ./logstash/mqtt.conf:/usr/share/logstash/pipeline/mqtt.conf
@@ -72,6 +73,11 @@ services:
         published: 1443
         protocol: udp
         mode: host
+    networks:
+      default:
+      outside:
+        ipv4_address:
+          "${QPEP_GATEWAY}"
     volumes:
       - ./server:/build/config
     command:
@@ -79,14 +85,20 @@ services:
 
   server-httpd:
     image: "httpd:2.4"
-    hostname: HTTPD
-    volumes:
-      - "./http-data:/usr/local/apache2/htdocs/"
+    extra_hosts:
+      - "HTTPD:${HTTPD_ADDRESS}"
     ports:
-      - target: 8080
-        published: 8080
+      - target: 80
+        published: 80
         protocol: tcp
         mode: host
+    networks:
+      default:
+      outside:
+        ipv4_address:
+          "${HTTPD}"
+    volumes:
+      - "./http-data:/usr/local/apache2/htdocs/"
 
 networks:
   outside:
