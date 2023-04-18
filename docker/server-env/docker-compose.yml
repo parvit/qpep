@@ -1,7 +1,7 @@
 # Performance server
 
 # set environment variables before running:
-# PUBLIC_ADDRESS
+# SERVER_PUBLIC_ADDRESS
 
 version: "1.0"
 services:
@@ -16,8 +16,8 @@ services:
       queue:
         condition: service_started
     extra_hosts:
-      - "MQTT:${PUBLIC_ADDRESS}"
-      - "LOGSTASH:${PUBLIC_ADDRESS}"
+      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
+      - "LOGSTASH:${SERVER_PUBLIC_ADDRESS}"
     ports:
       - target: 5044
         published: 5044
@@ -35,8 +35,8 @@ services:
       context: ./mosquitto
       dockerfile: Dockerfile
     extra_hosts:
-      - "MQTT:${PUBLIC_ADDRESS}"
-      - "LOGSTASH:${PUBLIC_ADDRESS}"
+      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
+      - "LOGSTASH:${SERVER_PUBLIC_ADDRESS}"
     ports:
       - target: 1883
         published: 1883
@@ -52,9 +52,9 @@ services:
       - queue
       - collector
     extra_hosts:
-      - "MQTT:${PUBLIC_ADDRESS}"
-      - "QPEP_GATEWAY:${PUBLIC_ADDRESS}"
-      - "QPEP_ADDRESS:127.0.0.1"
+      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
+      - "QPEP_GATEWAY:${SERVER_PUBLIC_ADDRESS}"
+      - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
     ports:
       - target: 1443
         published: 1443

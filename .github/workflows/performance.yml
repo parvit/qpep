@@ -13,30 +13,15 @@ on:
         type: string
         default: enp0s8
         required: true
-      gateway_address:
-        description: 'address for client to use as gateway'
+      server_public_address:
+        description: 'address for the server'
         type: string
-        default: 192.168.1.50
+        default: 192.168.1.21
         required: true
-      logstash_address:
-        description: 'serverside address for logstash instance'
+      server_data_public_address:
+        description: 'address for the server data'
         type: string
-        default: 192.168.1.51
-        required: true
-      mqtt_address:
-        description: 'serverside address for mqtt instance'
-        type: string
-        default: 192.168.1.52
-        required: true
-      httpd_address:
-        description: 'serverside address for httpd instance'
-        type: string
-        default: 192.168.1.53
-        required: true
-      subnet:
-        description: 'subnet for serverside addresses'
-        type: string
-        default: 192.168.1.0/24
+        default: 192.168.1.22
         required: true
 
 run-name: Performance Testing - ${{ inputs.gateway_address }}
@@ -104,12 +89,9 @@ jobs:
     needs: [ start-data-server ]
     runs-on: vm-server
     env:
-      CONTAINERS_SUBNET: ${{ inputs.subnet }}
-      MQTT_ADDRESS: ${{ inputs.mqtt_address }}
-      LOGSTASH_ADDRESS: ${{ inputs.logstash_address }}
+      SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
+      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
       LISTEN_ADDRESS: 127.0.0.1
-      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
-      HTTPD_ADDRESS: ${{ inputs.httpd_address }}
     steps:
       - uses: actions/checkout@v3
 
@@ -138,9 +120,9 @@ jobs:
       - name: Wait Tests
         run: |
           sleep 10
-          wget --tries=2 http://${HTTPD_ADDRESS}/target_1M.dat
-          wget --tries=2 http://${HTTPD_ADDRESS}/target_10M.dat
-          wget --tries=2 http://${HTTPD_ADDRESS}/target_100M.dat
+          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_1M.dat
+          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_10M.dat
+          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_100M.dat
           sleep 10
 
       - name: Cleanup
@@ -154,8 +136,7 @@ jobs:
   start-data-server:
     runs-on: vm-data-server
     env:
-      HTTPD_ADDRESS: ${{ inputs.httpd_address }}
-      CONTAINERS_SUBNET: ${{ inputs.subnet }}
+      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
 
     steps:
       - uses: actions/checkout@v3
