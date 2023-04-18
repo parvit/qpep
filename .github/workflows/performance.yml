@@ -11,20 +11,15 @@ on:
       connection_delay_device:
         description: 'serverside network device to set delay on'
         type: string
-        default: enp0s8
+        default: enp0s3
         required: true
       server_public_address:
         description: 'address for the server'
         type: string
         default: 192.168.1.21
         required: true
-      server_data_public_address:
-        description: 'address for the server data'
-        type: string
-        default: 192.168.1.22
-        required: true
 
-run-name: Performance Testing - ${{ inputs.gateway_address }}
+run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.server_public_address }}ms delay
 
 jobs:
 #  run-client:
@@ -86,11 +81,10 @@ jobs:
 #          Get-Process qpep | Stop-Process
 #
   run-server:
-    needs: [ start-data-server ]
+#    needs: [ start-data-server ]
     runs-on: vm-server
     env:
       SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
-      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
       LISTEN_ADDRESS: 127.0.0.1
     steps:
       - uses: actions/checkout@v3
@@ -110,7 +104,14 @@ jobs:
           cd docker/
           pushd build-linux/
           docker build -t project-faster/qpep_server .
+
+      - name: Generate test data
+        run: |
+          cd docker/server-data-env/
+          pushd http-data/
+          bash gen-local-data.sh
           popd
+          docker compose up -d
 
       - name: Run Server
         run: |
@@ -120,48 +121,58 @@ jobs:
       - name: Wait Tests
         run: |
           sleep 10
-          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_1M.dat
-          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_10M.dat
-          wget --tries=2 http://${DATA_PUBLIC_ADDRESS}/target_100M.dat
-          sleep 10
+          for((i=0;i<5;i++)); do
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_1M.dat
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_10M.dat
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_100M.dat
+            sleep 1
+          done
+
+      - name: Stop Containers
+        if: always()
+        run: |
+          cd docker/
+          pushd server-env/
+          docker compose down -v
+          popd
+          pushd server-data-env/
+          docker compose down -v
 
       - name: Cleanup
         if: always()
         run: |
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
-          cd docker/server-env/
-          docker compose down -v
           docker image rm project-faster/qpep_server || true
 
-  start-data-server:
-    runs-on: vm-data-server
-    env:
-      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Generate test data
-        run: |
-          cd docker/server-data-env/http-data/
-          bash gen-local-data.sh
-
-      - name: Start Server
-        run: |
-          cd docker/server-data-env/
-          docker compose up -d
-
-  stop-data-server:
-    needs: [  run-server ] # run-client,
-    if: ${{ always() }}
-    runs-on: vm-data-server
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Stop Server
-        run: |
-          cd docker/server-env/
-          docker compose down -v
+#  start-data-server:
+#    runs-on: vm-data-server
+#    env:
+#      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
+#
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Generate test data
+#        run: |
+#          cd docker/server-data-env/http-data/
+#          bash gen-local-data.sh
+#
+#      - name: Start Server
+#        run: |
+#          cd docker/server-data-env/
+#          docker compose up -d
+#
+#  stop-data-server:
+#    needs: [  run-server ] # run-client,
+#    if: ${{ always() }}
+#    runs-on: vm-data-server
+#    steps:
+#      - uses: actions/checkout@v3
+#
+#      - name: Stop Server
+#        run: |
+#          cd docker/server-data-env/
+#          docker compose down -v
 
 #  check:
 #    needs: [ stop-data-server, run-client, run-server ]
