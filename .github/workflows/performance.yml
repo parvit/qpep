@@ -19,7 +19,7 @@ on:
         default: 192.168.1.21
         required: true
 
-run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.server_public_address }}ms delay
+run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
 jobs:
 #  run-client:
