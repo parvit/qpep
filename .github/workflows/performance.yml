@@ -122,9 +122,9 @@ jobs:
         run: |
           sleep 10
           for((i=0;i<5;i++)); do
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_1M.dat
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_10M.dat
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_100M.dat
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_1M.dat -O /dev/null
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_10M.dat -O /dev/null
+            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_100M.dat -O /dev/null
             sleep 1
           done
 
