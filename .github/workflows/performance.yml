@@ -22,66 +22,64 @@ on:
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
 jobs:
-#  run-client:
-#    needs: [ start-data-server ]
-#    runs-on: vm-client
-#    env:
-#      LISTEN_ADDRESS: 127.0.0.1
-#      REMOTE_GATEWAY: ${{ inputs.gateway_address }}
-#    strategy:
-#      matrix:
-#        timeout_sec: [ 60 ]
-#        connections_number: [ 1, 4, 8, 16 ]
-#    steps:
-#      - uses: actions/checkout@v3
+  run-client:
+    runs-on: vm-client
+    env:
+      REMOTE_GATEWAY: ${{ inputs.server_public_address }}
+      LISTEN_ADDRESS: 127.0.0.1
+    strategy:
+      matrix:
+        download_size: [ 1, 10, 100 ]
+        connections_number: [ 1, 4, 8, 16 ]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          clean: true
+
+#      - name: Set up Go
+#        uses: actions/setup-go@v3
 #        with:
-#          clean: true
+#          go-version: 1.18.10
 #
-##      - name: Set up Go
-##        uses: actions/setup-go@v3
-##        with:
-##          go-version: 1.18.10
-##
-#      - name: Prepare
-#        shell: powershell
-#        run: |
-#          New-Item -Path . -Name "build" -ItemType "directory" -Force
-#          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
-#          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
-#          $config = $config -replace '%QPEP_GATEWAY%',"${REMOTE_GATEWAY}"
-#          $config = $config -replace '%QPEP_ADDRESS%',"${LISTEN_ADDRESS}"
-#          $config > ./build/config/qpep.yml
-#          Get-Content -Path ./build/config/qpep.yml
-#
-#      - name: Build Client
-#        shell: cmd
-#        run: |
-#          set CGO_ENABLED=1
-#          set GOOS=windows
-#          set GOHOSTARCH=amd64
-#          set GOHOSTOS=windows
-#          go build -v -o build/qpep.exe
-#
-#      - name: Run Client
-#        shell: powershell
-#        run: |
-#          Copy-Item "./windivert/x64/*" -Destination "./build"
-#          Start-Process "./build/qpep.exe" -WorkingDir "./build"
-#
-#      - name: Run Tests
-#        shell: powershell
-#        run: |
-#          cd speedtests/
-#          go test speed_test.go -test.timeout 10m -test_timeout ${{ matrix.timeout_sec }} -connections_num ${{ matrix.connections_num }}
-#
-#      - name: Stop Client
-#        if: always()
-#        shell: powershell
-#        run: |
-#          Get-Process qpep | Stop-Process
-#
+      - name: Prepare
+        shell: powershell
+        run: |
+          New-Item -Path . -Name "build" -ItemType "directory" -Force
+          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
+          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
+          $config = $config -replace '%QPEP_GATEWAY%',"${REMOTE_GATEWAY}"
+          $config = $config -replace '%QPEP_ADDRESS%',"${LISTEN_ADDRESS}"
+          $config > ./build/config/qpep.yml
+          Get-Content -Path ./build/config/qpep.yml
+
+      - name: Build Client
+        shell: cmd
+        run: |
+          set CGO_ENABLED=1
+          set GOOS=windows
+          set GOHOSTARCH=amd64
+          set GOHOSTOS=windows
+          go build -v -o build/qpep.exe
+
+      - name: Run Client
+        shell: powershell
+        run: |
+          Copy-Item "./windivert/x64/*" -Destination "./build"
+          Start-Process "./build/qpep.exe" -WorkingDir "./build"
+
+      - name: Run Tests
+        shell: powershell
+        run: |
+          cd speedtests/
+          go test speed_test.go -test.timeout 10m -size ${{ matrix.download_size }} -connections_num ${{ matrix.connections_num }}
+
+      - name: Stop Client
+        if: always()
+        shell: powershell
+        run: |
+          Get-Process qpep | Stop-Process
+
   run-server:
-#    needs: [ start-data-server ]
     runs-on: vm-server
     env:
       SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
@@ -120,13 +118,7 @@ jobs:
 
       - name: Wait Tests
         run: |
-          sleep 10
-          for((i=0;i<5;i++)); do
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_1M.dat -O /dev/null
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_10M.dat -O /dev/null
-            wget -q --tries=2 http://${SERVER_PUBLIC_ADDRESS}/target_100M.dat -O /dev/null
-            sleep 1
-          done
+          sleep 120
 
       - name: Stop Containers
         if: always()
@@ -143,36 +135,6 @@ jobs:
         run: |
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
           docker image rm project-faster/qpep_server || true
-
-#  start-data-server:
-#    runs-on: vm-data-server
-#    env:
-#      DATA_PUBLIC_ADDRESS: ${{ inputs.server_data_public_address }}
-#
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Generate test data
-#        run: |
-#          cd docker/server-data-env/http-data/
-#          bash gen-local-data.sh
-#
-#      - name: Start Server
-#        run: |
-#          cd docker/server-data-env/
-#          docker compose up -d
-#
-#  stop-data-server:
-#    needs: [  run-server ] # run-client,
-#    if: ${{ always() }}
-#    runs-on: vm-data-server
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Stop Server
-#        run: |
-#          cd docker/server-data-env/
-#          docker compose down -v
 
 #  check:
 #    needs: [ stop-data-server, run-client, run-server ]
