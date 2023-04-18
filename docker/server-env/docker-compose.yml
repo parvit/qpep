@@ -1,11 +1,7 @@
 # Performance server
 
 # set environment variables before running:
-# CONTAINERS_SUBNET
-# MQTT_ADDRESS
-# LISTEN_ADDRESS
-# REMOTE_GATEWAY
-# LOGSTASH_ADDRESS
+# PUBLIC_ADDRESS
 
 version: "1.0"
 services:
@@ -20,18 +16,14 @@ services:
       queue:
         condition: service_started
     extra_hosts:
-      - "MQTT:${MQTT_ADDRESS}"
-      - "LOGSTASH:${LOGSTASH_ADDRESS}"
+      - "MQTT:${PUBLIC_ADDRESS}"
+      - "LOGSTASH:${PUBLIC_ADDRESS}"
     ports:
       - target: 5044
         published: 5044
         protocol: tcp
         mode: host
-    networks:
-      default:
-      outside:
-        ipv4_address:
-          "${LOGSTASH_ADDRESS}"
+    network_mode: "host"
     volumes:
       - ./logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml
       - ./logstash/mqtt.conf:/usr/share/logstash/pipeline/mqtt.conf
@@ -43,18 +35,14 @@ services:
       context: ./mosquitto
       dockerfile: Dockerfile
     extra_hosts:
-      - "MQTT:${MQTT_ADDRESS}"
-      - "LOGSTASH:${LOGSTASH_ADDRESS}"
+      - "MQTT:${PUBLIC_ADDRESS}"
+      - "LOGSTASH:${PUBLIC_ADDRESS}"
     ports:
       - target: 1883
         published: 1883
         protocol: tcp
         mode: host
-    networks:
-      default:
-      outside:
-        ipv4_address:
-          "${MQTT_ADDRESS}"
+    network_mode: "host"
     volumes:
       - ./mosquitto/mosquitto.conf:/etc/mosquitto/mosquitto.conf
 
@@ -64,28 +52,16 @@ services:
       - queue
       - collector
     extra_hosts:
-      - "MQTT:${MQTT_ADDRESS}"
-      - "QPEP_GATEWAY:${REMOTE_GATEWAY}"
-      - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
+      - "MQTT:${PUBLIC_ADDRESS}"
+      - "QPEP_GATEWAY:${PUBLIC_ADDRESS}"
+      - "QPEP_ADDRESS:127.0.0.1"
     ports:
       - target: 1443
         published: 1443
         protocol: udp
         mode: host
-    networks:
-      default:
-      outside:
-        ipv4_address:
-          "${REMOTE_GATEWAY}"
+    network_mode: "host"
     volumes:
       - ./server:/build/config
     command:
       - sh -c 'cd /build && ./qpep -server'
-
-networks:
-  outside:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: "${CONTAINERS_SUBNET}" # eg. 192.168.1.0/24

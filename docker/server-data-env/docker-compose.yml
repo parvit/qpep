@@ -4,26 +4,6 @@ version: "1.0"
 services:
   server-httpd:
     image: "httpd:2.4"
-#    extra_hosts:
-#      - "HTTPD:${HTTPD_ADDRESS}"
     network_mode: "host"
-#    ports:
-#      - target: 80
-#        published: 80
-#        protocol: tcp
-#        mode: host
-#    networks:
-#      default:
-#      outside:
-#        ipv4_address:
-#          "${HTTPD_ADDRESS}"
     volumes:
       - "./http-data:/usr/local/apache2/htdocs/"
-
-#networks:
-#  outside:
-#    driver: bridge
-#    ipam:
-#      driver: default
-#      config:
-#        - subnet: "${CONTAINERS_SUBNET}" # eg. 192.168.1.0/24
