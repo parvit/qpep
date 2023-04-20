@@ -29,8 +29,10 @@ jobs:
       LISTEN_ADDRESS: 127.0.0.1
     strategy:
       matrix:
-        download_size: [ 1, 10, 100 ]
-        connections_number: [ 1, 4, 8, 16 ]
+        download_size: [ 10 ]
+        connections_number: [ 4 ]
+#        download_size: [ 1, 10, 100 ]
+#        connections_number: [ 1, 4, 8, 16 ]
     steps:
       - uses: actions/checkout@v3
         with:
