@@ -67,7 +67,7 @@ jobs:
         shell: cmd
         run: |
           cd build/
-          start build/qpep.exe -c
+          start qpep.exe -c
 
       - name: Run Tests
         shell: powershell
