@@ -66,13 +66,15 @@ jobs:
         shell: powershell
         run: |
           Copy-Item "./windivert/x64/*" -Destination "./build"
-          Start-Process "./build/qpep.exe" -ArgumentList "-c" -WorkingDir "./build"
+          Start-Job -scriptblock {
+            Start-Process "./build/qpep.exe" -ArgumentList "-c" -WorkingDirectory "./build"
+          }
 
       - name: Run Tests
         shell: powershell
         run: |
           cd docker/speedtests/
-          go test speed_test.go -test.timeout 10m -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_num }}
+          go test speed_test.go -test.timeout 10m -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }}
 
       - name: Stop Client
         if: always()
