@@ -67,7 +67,7 @@ jobs:
         shell: powershell
         run: |
           Copy-Item "./windivert/x64/*" -Destination "./build"
-          Start-Process "./build/qpep.exe" -WorkingDir "./build"
+          Start-Process "./build/qpep.exe" -ArgumentList "-c" -WorkingDir "./build"
 
       - name: Run Tests
         shell: powershell
