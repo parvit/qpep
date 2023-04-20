@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 )
@@ -19,6 +20,9 @@ var connections = flag.Int("connections_num", 1, "simultaneous tcp connections t
 func TestSpeedTestsConfigSuite(t *testing.T) {
 	t.Log(*targetURL)
 	t.Log(*connections)
+
+	assert.True(t, *connections > 0)
+	assert.True(t, len(*targetURL) > 0)
 
 	var q SpeedTestsConfigSuite
 	suite.Run(t, &q)
@@ -31,12 +35,21 @@ type SpeedTestsConfigSuite struct {
 func (s *SpeedTestsConfigSuite) TestRun() {
 	shared.GetSystemProxyEnabled()
 
-	client := getClientForAPI(nil)
-	assert.NotNil(s.T(), client)
-	assert.NotNil(s.T(), targetURL)
+	wg := &sync.WaitGroup{}
+	wg.Add(*connections)
 
-	_, err := client.Get(*targetURL)
-	assert.Nil(s.T(), err)
+	go func() {
+		defer wg.Done()
+
+		client := getClientForAPI(nil)
+		assert.NotNil(s.T(), client)
+		assert.NotNil(s.T(), targetURL)
+
+		_, err := client.Get(*targetURL)
+		assert.Nil(s.T(), err)
+	}()
+
+	wg.Wait()
 }
 
 func getClientForAPI(localAddr net.Addr) *http.Client {

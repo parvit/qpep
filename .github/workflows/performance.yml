@@ -71,7 +71,7 @@ jobs:
         shell: powershell
         run: |
           cd speedtests/
-          go test speed_test.go -test.timeout 10m -size ${{ matrix.download_size }} -connections_num ${{ matrix.connections_num }}
+          go test speed_test.go -test.timeout 10m -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_num }}
 
       - name: Stop Client
         if: always()
