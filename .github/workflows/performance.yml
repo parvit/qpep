@@ -70,7 +70,7 @@ jobs:
       - name: Run Tests
         shell: powershell
         run: |
-          cd speedtests/
+          cd docker/speedtests/
           go test speed_test.go -test.timeout 10m -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_num }}
 
       - name: Stop Client
