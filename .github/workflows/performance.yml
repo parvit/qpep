@@ -52,6 +52,7 @@ jobs:
           $config = $config.replace('<QPEP_GATEWAY>',$env:REMOTE_GATEWAY)
           $config = $config.replace('<QPEP_ADDRESS>',$env:LISTEN_ADDRESS)
           $config > ./build/config/qpep.yml
+          Copy-Item "./windivert/x64/*" -Destination "./build"
 
       - name: Build Client
         shell: cmd
@@ -63,12 +64,10 @@ jobs:
           go build -v -o build/qpep.exe
 
       - name: Run Client
-        shell: powershell
+        shell: cmd
         run: |
-          Copy-Item "./windivert/x64/*" -Destination "./build"
-          Start-Job -scriptblock {
-            Start-Process "./build/qpep.exe" -ArgumentList "-c" -WorkingDirectory "./build"
-          }
+          cd build/
+          start build/qpep.exe -c
 
       - name: Run Tests
         shell: powershell
