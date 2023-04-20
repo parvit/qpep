@@ -1,9 +1,9 @@
 
 # client
-gateway: %QPEP_GATEWAY%
+gateway: <QPEP_GATEWAY>
 port: 1443
 apiport: 444
-listenaddress: %QPEP_ADDRESS%
+listenaddress: <QPEP_ADDRESS>
 listenport: 9443
 
 # default
