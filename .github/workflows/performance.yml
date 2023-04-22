@@ -70,7 +70,7 @@ jobs:
           cmd /c "START /b qpep.exe -c"
 
       - name: Run Tests
-        shell: powershell
+        shell: cmd
         run: |
           cd docker/speedtests/
           go test speed_test.go -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 10m 
@@ -80,6 +80,11 @@ jobs:
         shell: powershell
         run: |
           Get-Process qpep | Stop-Process
+
+      - name: Reset Proxy
+        if: always()
+        run: |
+          go run docker/speedtests/reset_proxy_util.go
 
 #  run-server:
 #    runs-on: vm-server
