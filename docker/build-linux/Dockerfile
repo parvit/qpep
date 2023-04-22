@@ -42,7 +42,7 @@ echo [DONE] \n\
 WORKDIR /root
 RUN printf '#!/bin/bash xe \n\
 cd /build \n\
-./qpep -server
+./qpep -server \n\
 ' > /root/run-qpep.sh
 
 RUN sh -c 'dos2unix /root/build-qpep.sh'
