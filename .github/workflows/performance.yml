@@ -84,7 +84,7 @@ jobs:
       - name: Reset Proxy
         if: always()
         run: |
-          go run docker/speedtests/reset_proxy_util.go
+          go run docker/speedtests/utils/reset_proxy_util.go
 
 #  run-server:
 #    runs-on: vm-server
