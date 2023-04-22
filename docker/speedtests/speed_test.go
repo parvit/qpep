@@ -38,8 +38,14 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	wg := &sync.WaitGroup{}
 	wg.Add(*connections)
 
-	go func() {
-		defer wg.Done()
+	index := 0
+
+	go func(id int) {
+		defer func() {
+			s.T().Logf("Executor #%d done\n", id)
+			wg.Done()
+		}()
+		s.T().Logf("Starting executor #%d\n", id)
 
 		client := getClientForAPI(nil)
 		assert.NotNil(s.T(), client)
@@ -47,7 +53,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 		_, err := client.Get(*targetURL)
 		assert.Nil(s.T(), err)
-	}()
+	}(index)
 
 	wg.Wait()
 }
