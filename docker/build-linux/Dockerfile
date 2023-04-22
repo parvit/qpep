@@ -43,7 +43,7 @@ WORKDIR /root
 RUN printf '#!/bin/bash -xe \n\
 bash /root/build-qpep.sh \n\
 cd /build \n\
-./qpep -server \n\
+./qpep -v \n\
 ' > /root/run-qpep.sh
 
 RUN sh -c 'dos2unix /root/*.sh'
