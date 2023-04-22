@@ -41,6 +41,7 @@ echo [DONE] \n\
 
 WORKDIR /root
 RUN printf '#!/bin/bash -xe \n\
+bash /root/build-qpep.sh \n\
 cd /build \n\
 ./qpep -server \n\
 ' > /root/run-qpep.sh
@@ -48,6 +49,3 @@ cd /build \n\
 RUN sh -c 'dos2unix /root/*.sh'
 RUN sh -c 'chmod 777 /root/*.sh'
 RUN sh -c 'chmod +x /root/*.sh'
-
-WORKDIR /root/qpep
-ENTRYPOINT ["/root/build-qpep.sh"]
