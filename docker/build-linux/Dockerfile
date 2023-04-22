@@ -42,6 +42,9 @@ echo [DONE] \n\
 WORKDIR /root
 RUN printf '#!/bin/bash -xe \n\
 bash /root/build-qpep.sh \n\
+ping -c 3 QPEP_GATEWAY \n\
+ping -c 3 QPEP_ADDRESS \n\
+ping -c 3 MQTT \n\
 cd /build \n\
 ./qpep -v \n\
 ' > /root/run-qpep.sh
