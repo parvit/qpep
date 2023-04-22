@@ -63,5 +63,5 @@ services:
     network_mode: "host"
     volumes:
       - ./server:/build/config
-    command:
+    entrypoint:
       - /root/run-qpep.sh
