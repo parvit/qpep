@@ -45,11 +45,9 @@ cd /build \n\
 ./qpep -server \n\
 ' > /root/run-qpep.sh
 
-RUN sh -c 'dos2unix /root/build-qpep.sh'
-RUN sh -c 'chmod 777 /root/build-qpep.sh'
-RUN sh -c 'chmod +x /root/build-qpep.sh'
-
-RUN sh -c 'cat /root/build-qpep.sh'
+RUN sh -c 'dos2unix /root/*.sh'
+RUN sh -c 'chmod 777 /root/*.sh'
+RUN sh -c 'chmod +x /root/*.sh'
 
 WORKDIR /root/qpep
 ENTRYPOINT ["/root/build-qpep.sh"]
