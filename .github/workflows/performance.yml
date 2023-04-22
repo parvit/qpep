@@ -73,7 +73,8 @@ jobs:
         shell: cmd
         run: |
           cd docker/speedtests/
-          go test speed_test.go -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m 
+          cmd /c "go test speed_test.go -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
+          type out.log
 
       - name: Stop Client
         if: always()
@@ -86,62 +87,62 @@ jobs:
         run: |
           go run docker/speedtests/utils/reset_proxy_util.go
 
-#  run-server:
-#    runs-on: vm-server
-#    env:
-#      SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
-#      LISTEN_ADDRESS: 127.0.0.1
-#    steps:
-#      - uses: actions/checkout@v3
-#
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
-#        with:
-#          go-version: 1.18
-#
-#      - name: Set connection delay
-#        run: |
-#          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
-#
-#      - name: Build Server
-#        run: |
-#          docker version
-#          cd docker/
-#          pushd build-linux/
-#          docker build -t project-faster/qpep_server .
-#
-#      - name: Generate test data
-#        run: |
-#          cd docker/server-data-env/
-#          pushd http-data/
-#          bash gen-local-data.sh
-#          popd
-#          docker compose up -d
-#
-#      - name: Run Server
-#        run: |
-#          cd docker/server-env/
-#          docker compose up -d
-#
-#      - name: Wait Tests
-#        run: |
-#          sleep 120
-#
-#      - name: Stop Containers
-#        if: always()
-#        run: |
-#          cd docker/
-#          pushd server-env/
-#          docker compose down -v
-#          popd
-#          pushd server-data-env/
-#          docker compose down -v
-#
-#      - name: Cleanup
-#        if: always()
-#        run: |
-#          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
-#          docker image rm project-faster/qpep_server || true
+  run-server:
+    runs-on: vm-server
+    env:
+      SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
+      LISTEN_ADDRESS: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: Set connection delay
+        run: |
+          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
+
+      - name: Build Server
+        run: |
+          docker version
+          cd docker/
+          pushd build-linux/
+          docker build -t project-faster/qpep_server .
+
+      - name: Generate test data
+        run: |
+          cd docker/server-data-env/
+          pushd http-data/
+          bash gen-local-data.sh
+          popd
+          docker compose up -d
+
+      - name: Run Server
+        run: |
+          cd docker/server-env/
+          docker compose up -d
+
+      - name: Wait Tests
+        run: |
+          sleep 120
+
+      - name: Stop Containers
+        if: always()
+        run: |
+          cd docker/
+          pushd server-env/
+          docker compose down -v
+          popd
+          pushd server-data-env/
+          docker compose down -v
+
+      - name: Cleanup
+        if: always()
+        run: |
+          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
+          docker image rm project-faster/qpep_server || true
 
 #  check:
 #    needs: [ stop-data-server, run-client, run-server ]
