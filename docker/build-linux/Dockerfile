@@ -39,6 +39,12 @@ cp /root/qpep/qpep /build/qpep \n\
 echo [DONE] \n\
 ' > /root/build-qpep.sh
 
+WORKDIR /root
+RUN printf '#!/bin/bash xe \n\
+cd /build \n\
+./qpep -server
+' > /root/run-qpep.sh
+
 RUN sh -c 'dos2unix /root/build-qpep.sh'
 RUN sh -c 'chmod 777 /root/build-qpep.sh'
 RUN sh -c 'chmod +x /root/build-qpep.sh'
