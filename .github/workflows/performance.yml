@@ -18,6 +18,11 @@ on:
         type: string
         default: 192.168.1.21
         required: true
+      client_listen_address:
+        description: 'address for the client to listen on'
+        type: string
+        default: 192.168.1.21
+        required: true
 
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
@@ -26,7 +31,7 @@ jobs:
     runs-on: vm-client
     env:
       REMOTE_GATEWAY: ${{ inputs.server_public_address }}
-      LISTEN_ADDRESS: 127.0.0.1
+      LISTEN_ADDRESS: ${{ inputs.client_listen_address }}
     strategy:
       matrix:
         download_size: [ 10 ]
