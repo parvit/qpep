@@ -40,7 +40,7 @@ echo [DONE] \n\
 ' > /root/build-qpep.sh
 
 WORKDIR /root
-RUN printf '#!/bin/bash xe \n\
+RUN printf '#!/bin/bash -xe \n\
 cd /build \n\
 ./qpep -server \n\
 ' > /root/run-qpep.sh
