@@ -77,13 +77,13 @@ jobs:
       - name: Wait Server
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "http://${REMOTE_GATEWAY}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 1 -MaximumRetryCount 60
+          Invoke-WebRequest -Uri "http://${{ inputs.server_public_address }}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 1 -MaximumRetryCount 60
 
       - name: Run Tests
         shell: cmd
         run: |
           cd docker/speedtests/
-          cmd /c "go test speed_test.go -target_url http://${REMOTE_GATEWAY}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
+          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
           type out.log
 
       - name: Stop Client
