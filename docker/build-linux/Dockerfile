@@ -25,7 +25,7 @@ RUN sh -c 'tar -xvvf go1.18.10.linux-amd64.tar.gz'
 
 WORKDIR /root
 RUN printf '#!/bin/bash -xe \n\
-echo [CLONE] \n\
+echo [CLONE from ${QPEP_REPO}@${QPEP_BRANCH}:${QPEP_REV}] \n\
 cd /root \n\
 git clone ${QPEP_REPO} || true     \n\
 cd /root/qpep \n\
