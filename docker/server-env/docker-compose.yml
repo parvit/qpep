@@ -55,6 +55,8 @@ services:
       - "MQTT:${SERVER_PUBLIC_ADDRESS}"
       - "QPEP_GATEWAY:${SERVER_PUBLIC_ADDRESS}"
       - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
+    environment:
+      - "QPEP_BRANCH=issue-22-performance-testing"
     ports:
       - target: 1443
         published: 1443
