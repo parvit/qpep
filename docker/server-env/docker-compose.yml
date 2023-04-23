@@ -57,6 +57,7 @@ services:
       - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
     environment:
       - "QPEP_BRANCH=issue-22-performance-testing"
+      - "QPEP_REPO=https://github.com/parvit/qpep.git"
     ports:
       - target: 1443
         published: 1443
