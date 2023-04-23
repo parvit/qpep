@@ -16,12 +16,17 @@ on:
       server_public_address:
         description: 'address for the server'
         type: string
-        default: 192.168.1.21
+        default: 35.163.142.7
         required: true
       client_listen_address:
         description: 'address for the client to listen on'
         type: string
         default: 192.168.1.21
+        required: true
+      docker-compose-command:
+        description: 'command of docker compose for various linux versions'
+        type: string
+        default: docker compose
         required: true
 
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
@@ -122,12 +127,12 @@ jobs:
           pushd http-data/
           bash gen-local-data.sh
           popd
-          docker compose up -d
+          ${{ inputs.docker-compose-command }} up -d
 
       - name: Run Server
         run: |
           cd docker/server-env/
-          docker compose up -d
+          ${{ inputs.docker-compose-command }} up -d
 
       - name: Wait Tests
         run: |
@@ -137,13 +142,13 @@ jobs:
         if: always()
         run: |
           cd docker/server-env/
-          docker compose down -v
+          ${{ inputs.docker-compose-command }} down -v
 
       - name: Stop Data Server Container
         if: always()
         run: |
           cd docker/server-data-env/
-          docker compose down -v
+          ${{ inputs.docker-compose-command }} down -v
 
       - name: Cleanup
         if: always()
