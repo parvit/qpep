@@ -131,7 +131,7 @@ jobs:
 
       - name: Wait Tests
         run: |
-          sleep 120
+          sleep 60
 
       - name: Stop Containers
         if: always()
