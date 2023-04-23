@@ -93,8 +93,9 @@ jobs:
                 Start-Sleep -Seconds 1
               }
               else {
-                Write-Host "Could not get server after 3 retries."
+                Write-Error "Could not get server after 3 retries." -Action Stop
                 $Stoploop = $true
+                
               }
             }
           }
