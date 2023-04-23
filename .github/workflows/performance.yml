@@ -23,11 +23,6 @@ on:
         type: string
         default: 192.168.1.21
         required: true
-      docker-compose-command:
-        description: 'command of docker compose for various linux versions'
-        type: string
-        default: docker compose
-        required: true
 
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
@@ -79,6 +74,11 @@ jobs:
           cd build/
           cmd /c "START /b qpep.exe -c"
 
+      - name: Wait Server
+        shell: powershell
+        run: |
+          Invoke-WebRequest -Uri "http://${REMOTE_GATEWAY}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 60
+
       - name: Run Tests
         shell: cmd
         run: |
@@ -108,7 +108,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.18.10
 
       - name: Set connection delay
         run: |
@@ -127,12 +127,12 @@ jobs:
           pushd http-data/
           bash gen-local-data.sh
           popd
-          ${{ inputs.docker-compose-command }} up -d
+          docker compose up -d
 
       - name: Run Server
         run: |
           cd docker/server-env/
-          ${{ inputs.docker-compose-command }} up -d
+          docker compose up -d
 
       - name: Wait Tests
         run: |
@@ -142,13 +142,13 @@ jobs:
         if: always()
         run: |
           cd docker/server-env/
-          ${{ inputs.docker-compose-command }} down -v
+          docker compose down -v
 
       - name: Stop Data Server Container
         if: always()
         run: |
           cd docker/server-data-env/
-          ${{ inputs.docker-compose-command }} down -v
+          docker compose down -v
 
       - name: Cleanup
         if: always()
