@@ -77,7 +77,7 @@ jobs:
       - name: Wait Server
         shell: powershell
         run: |
-          Stoploop = $false
+          $Stoploop = $false
           [ int ]$Retrycount = "10"
   
            do {
