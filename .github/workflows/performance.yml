@@ -116,7 +116,7 @@ jobs:
           pushd build-linux/
           docker build -t project-faster/qpep_server .
 
-      - name: Generate test data
+      - name: Run data server
         run: |
           cd docker/server-data-env/
           pushd http-data/
@@ -133,14 +133,16 @@ jobs:
         run: |
           sleep 60
 
-      - name: Stop Containers
+      - name: Stop Server Container
         if: always()
         run: |
-          cd docker/
-          pushd server-env/
+          cd docker/server-env/
           docker compose down -v
-          popd
-          pushd server-data-env/
+
+      - name: Stop Data Server Container
+        if: always()
+        run: |
+          cd docker/server-data-env/
           docker compose down -v
 
       - name: Cleanup

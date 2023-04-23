@@ -1,10 +1,10 @@
 
 # server
 gateway: QPEP_GATEWAY
-port: 1443
+port: 443
 apiport: 444
 listenaddress: QPEP_ADDRESS # added via extra_hosts
-listenport: 9443
+listenport: 1443
 
 # broker settings
 analytics:

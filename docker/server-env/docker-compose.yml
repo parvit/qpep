@@ -53,8 +53,8 @@ services:
     image: "project-faster/qpep_server"
     extra_hosts:
       - "MQTT:${SERVER_PUBLIC_ADDRESS}"
-      - "QPEP_GATEWAY:${SERVER_PUBLIC_ADDRESS}"
-      - "QPEP_ADDRESS:${LISTEN_ADDRESS}"
+      - "QPEP_GATEWAY:127.0.0.1"
+      - "QPEP_ADDRESS:${SERVER_PUBLIC_ADDRESS}"
     environment:
       - "QPEP_BRANCH=issue-22-performance-testing"
       - "QPEP_REPO=https://github.com/parvit/qpep.git"
