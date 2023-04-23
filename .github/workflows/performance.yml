@@ -77,7 +77,28 @@ jobs:
       - name: Wait Server
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "http://${{ inputs.server_public_address }}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 1 -MaximumRetryCount 60
+          Stoploop = $false
+          [ int ]$Retrycount = "10"
+  
+           do {
+            try {
+              Write-Host "Echoing server..."
+              Invoke-WebRequest -Uri "http://${{ inputs.server_public_address }}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 1
+              Write-Host "Job completed"
+              $Stoploop = $true
+            }
+            catch {
+              $Retrycount = $Retrycount - 1
+              if ($Retrycount -gt 0){
+                Start-Sleep -Seconds 1
+              }
+              else {
+                Write-Host "Could not get server after 3 retries."
+                $Stoploop = $true
+              }
+            }
+          }
+          While ($Stoploop -eq $false)
 
       - name: Run Tests
         shell: cmd
