@@ -77,7 +77,7 @@ jobs:
       - name: Wait Server
         shell: powershell
         run: |
-          Invoke-WebRequest -Uri "http://${REMOTE_GATEWAY}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 60
+          Invoke-WebRequest -Uri "http://${REMOTE_GATEWAY}:444/api/v1/client/echo" -UseBasicParsing -TimeoutSec 1 -MaximumRetryCount 60
 
       - name: Run Tests
         shell: cmd
