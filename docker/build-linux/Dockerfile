@@ -30,7 +30,9 @@ cd /root \n\
 git clone ${QPEP_REPO} || true     \n\
 cd /root/qpep \n\
 git switch ${QPEP_BRANCH} \n\
-git reset --hard ${QPEP_REV} \n\
+if [[ ! "${QPEP_REV}" -eq "HEAD" ]]; then \n\
+  git reset --hard ${QPEP_REV} \n\
+fi \n\
 export PATH=$GOROOT/bin:$PATH \n\
 echo [BUILD] \n\
 go build -v -o qpep \n\
