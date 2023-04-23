@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"context"
 	"github.com/parvit/qpep/logger"
 	"net"
 	"sort"
@@ -52,9 +51,9 @@ func AssertParamChoice(name, value string, choices []string) {
 // a valid ip address
 func AssertParamIP(name, value string) {
 	if ip := net.ParseIP(value); ip == nil {
-		addr, err := net.DefaultResolver.LookupHost(context.Background(), value) // domain name
-		if err == nil {
-			logger.Info("Hostname '%s' validated as ip address: %s\n", value, addr[0])
+		addr, err := net.LookupIP(value)
+		if err == nil && len(addr) > 0 {
+			logger.Info("Hostname '%s' validated as ip address: %s\n", value, addr[0].String())
 			return
 		}
 
