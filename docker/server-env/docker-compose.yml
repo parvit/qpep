@@ -1,7 +1,7 @@
 # Performance server
 
 # set environment variables before running:
-# SERVER_PUBLIC_ADDRESS
+# SERVER_ADDRESS
 
 version: "1.0"
 services:
@@ -16,8 +16,8 @@ services:
       queue:
         condition: service_started
     extra_hosts:
-      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
-      - "LOGSTASH:${SERVER_PUBLIC_ADDRESS}"
+      - "MQTT:${SERVER_ADDRESS}"
+      - "LOGSTASH:${SERVER_ADDRESS}"
     ports:
       - target: 5044
         published: 5044
@@ -38,8 +38,8 @@ services:
       server:
         condition: service_started
     extra_hosts:
-      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
-      - "LOGSTASH:${SERVER_PUBLIC_ADDRESS}"
+      - "MQTT:${SERVER_ADDRESS}"
+      - "LOGSTASH:${SERVER_ADDRESS}"
     ports:
       - target: 1883
         published: 1883
@@ -52,9 +52,9 @@ services:
   server:
     image: "project-faster/qpep_server"
     extra_hosts:
-      - "MQTT:${SERVER_PUBLIC_ADDRESS}"
+      - "MQTT:${SERVER_ADDRESS}"
       - "QPEP_GATEWAY:127.0.0.1"
-      - "QPEP_ADDRESS:${SERVER_PUBLIC_ADDRESS}"
+      - "QPEP_ADDRESS:${SERVER_ADDRESS}"
     environment:
       - "QPEP_BRANCH=issue-22-performance-testing"
       - "QPEP_REPO=https://github.com/parvit/qpep.git"
