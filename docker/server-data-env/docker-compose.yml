@@ -9,9 +9,6 @@ services:
     build:
       context: ./logstash
       dockerfile: Dockerfile
-    depends_on:
-      queue:
-        condition: service_started
     extra_hosts:
       - "MQTT:${SERVER_ADDRESS}"
       - "LOGSTASH:${SERVER_ADDRESS}"
@@ -31,9 +28,6 @@ services:
     build:
       context: ./mosquitto
       dockerfile: Dockerfile
-    depends_on:
-      server:
-        condition: service_started
     extra_hosts:
       - "MQTT:${SERVER_ADDRESS}"
       - "LOGSTASH:${SERVER_ADDRESS}"
