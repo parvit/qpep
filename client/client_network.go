@@ -101,11 +101,6 @@ func handleTCPConn(tcpConn net.Conn) {
 		Flags:      0,
 	}
 
-	if tcpLocalAddr.IP.String() == ClientConfiguration.GatewayHost {
-		sessionHeader.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
-	}
-	logger.Info("Connection flags : %d %d", sessionHeader.Flags, sessionHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
-
 	// divert check
 	if diverted == windivert.DIVERT_OK {
 		logger.Info("Diverted connection: %v:%v %v:%v", srcAddress, srcPort, dstAddress, dstPort)
@@ -118,6 +113,11 @@ func handleTCPConn(tcpConn net.Conn) {
 			IP:   net.ParseIP(dstAddress),
 			Port: dstPort,
 		}
+
+		if sessionHeader.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
+			sessionHeader.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
+		}
+		logger.Info("Connection flags : %d %d", sessionHeader.Flags, sessionHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", sessionHeader.SourceAddr, sessionHeader.DestAddr)
 		_, err := quicStream.Write(sessionHeader.ToBytes())
@@ -320,6 +320,11 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 			Port: port,
 		}
 
+		if header.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
+			header.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
+		}
+		logger.Info("Connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
+
 		logger.Info("Proxied connection")
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", header.SourceAddr, header.DestAddr)
 		_, err := stream.Write(header.ToBytes())
@@ -348,6 +353,11 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 			IP:   address,
 			Port: port,
 		}
+
+		if header.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
+			header.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
+		}
+		logger.Info("Connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 
 		t := http.Response{
 			Status:        http.StatusText(http.StatusOK),
