@@ -320,6 +320,7 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 			Port: port,
 		}
 
+		logger.Info("a:%s / b:%s", header.DestAddr.IP.String(), ClientConfiguration.GatewayHost)
 		if header.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
 			header.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
 		}
