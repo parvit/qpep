@@ -64,6 +64,11 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			defer resp.Body.Close()
 
 			toRead := resp.ContentLength
+			if toRead != int64(*expectedSize) {
+				assert.Fail(s.T(), "No response")
+				return
+			}
+
 			for toRead > 0 {
 				var buff = make([]byte, 1024)
 				rd := io.LimitReader(resp.Body, 1024)
