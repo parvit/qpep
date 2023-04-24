@@ -134,9 +134,11 @@ func QPepHeaderFromBytes(stream io.Reader) (*QPepHeader, error) {
 	}
 	destPortEnd := destIpEnd + 2
 
-	byteInput := make([]byte, destPortEnd)
+	flagsEnd := destPortEnd + 2
+
+	byteInput := make([]byte, flagsEnd)
 	readDataBytes, err := stream.Read(byteInput)
-	if readDataBytes != destPortEnd || err != nil {
+	if readDataBytes != flagsEnd || err != nil {
 		return nil, ErrInvalidHeaderDataLength
 	}
 
@@ -146,7 +148,7 @@ func QPepHeaderFromBytes(stream io.Reader) (*QPepHeader, error) {
 	destIPAddr := net.IP(byteInput[sourcePortEnd:destIpEnd])
 	destPort := int(binary.LittleEndian.Uint16(byteInput[destIpEnd:destPortEnd]))
 
-	flags := binary.LittleEndian.Uint16(byteInput[destPortEnd : destPortEnd+2])
+	flags := binary.LittleEndian.Uint16(byteInput[destPortEnd:flagsEnd])
 
 	srcAddr := &net.TCPAddr{IP: srcIPAddr, Port: srcPort}
 	dstAddr := &net.TCPAddr{IP: destIPAddr, Port: destPort}
