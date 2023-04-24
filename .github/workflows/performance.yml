@@ -168,25 +168,9 @@ jobs:
           cd docker/server-env/
           docker compose up -d
 
-      - name: Wait Tests 1
+      - name: Wait Tests
         run: |
-          sleep 600
-
-      - name: Wait Tests 2
-        run: |
-          sleep 600
-
-      - name: Wait Tests 3
-        run: |
-          sleep 600
-
-      - name: Wait Tests 4
-        run: |
-          sleep 600
-
-      - name: Wait Tests 5
-        run: |
-          sleep 600
+          sleep 360
 
       - name: Stop Server Container
         if: always()
