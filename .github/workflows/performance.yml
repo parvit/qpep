@@ -108,7 +108,7 @@ jobs:
         shell: cmd
         run: |
           cd docker/speedtests/
-          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
+          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
           type out.log
 
       - name: Stop Client
@@ -121,6 +121,11 @@ jobs:
         if: always()
         run: |
           go run docker/speedtests/utils/reset_proxy_util.go
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: performance_tests_logs
+          path: "${{ github.workspace }}/**/*.log"
 
       - name: Auto-cancel workflow on error
         if: failure()
@@ -184,6 +189,13 @@ jobs:
         run: |
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
           docker image rm project-faster/qpep_server || true
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: performance_tests_output
+          path:
+            - "${{ github.workspace }}/**/data.csv"
+            - "${{ github.workspace }}/**/*.log"
 
       - name: Auto-cancel workflow on error
         if: failure()
