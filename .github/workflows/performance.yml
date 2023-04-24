@@ -32,104 +32,104 @@ on:
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
 jobs:
-  run-client:
-    runs-on: vm-client
-    env:
-      REMOTE_GATEWAY: ${{ inputs.server_public_address }}
-      LISTEN_ADDRESS: ${{ inputs.client_listen_address }}
-    strategy:
-      matrix:
-        download_size: [ 10 ]
-        connections_number: [ 4 ]
-#        download_size: [ 1, 10, 100 ]
-#        connections_number: [ 1, 4, 8, 16 ]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          clean: true
-
-#      - name: Set up Go
-#        uses: actions/setup-go@v3
+#  run-client:
+#    runs-on: vm-client
+#    env:
+#      REMOTE_GATEWAY: ${{ inputs.server_public_address }}
+#      LISTEN_ADDRESS: ${{ inputs.client_listen_address }}
+#    strategy:
+#      matrix:
+#        download_size: [ 10 ]
+#        connections_number: [ 4 ]
+##        download_size: [ 1, 10, 100 ]
+##        connections_number: [ 1, 4, 8, 16 ]
+#    steps:
+#      - uses: actions/checkout@v3
 #        with:
-#          go-version: 1.18.10
+#          clean: true
 #
-      - name: Prepare
-        shell: powershell
-        run: |
-          New-Item -Path . -Name "build" -ItemType "directory" -Force
-          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
-          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
-          $config = $config.replace('<QPEP_GATEWAY>',$env:REMOTE_GATEWAY)
-          $config = $config.replace('<QPEP_ADDRESS>',$env:LISTEN_ADDRESS)
-          $config > ./build/config/qpep.yml
-          Copy-Item "./windivert/x64/*" -Destination "./build"
-
-      - name: Build Client
-        shell: cmd
-        run: |
-          set CGO_ENABLED=1
-          set GOOS=windows
-          set GOHOSTARCH=amd64
-          set GOHOSTOS=windows
-          go build -v -o build/qpep.exe
-
-      - name: Run Client
-        shell: cmd
-        run: |
-          cd build/
-          cmd /c "START /b qpep.exe -c"
-
-      - name: Wait Server
-        shell: powershell
-        run: |
-          $Stoploop = $false
-          [ int ]$Retrycount = "10"
-
-           do {
-            try {
-              Write-Host "Echoing server..."
-              Invoke-WebRequest -Uri "http://${{ inputs.server_public_address }}:444/api/v1/server/echo" -UseBasicParsing -TimeoutSec 1
-              Write-Host "Job completed"
-              $Stoploop = $true
-            }
-            catch {
-              $Retrycount = $Retrycount - 1
-              if ($Retrycount -gt 0){
-                Start-Sleep -Seconds 10
-              }
-              else {
-                Write-Error "Could not get server after 10 retries." -ErrorAction Stop
-              }
-            }
-          }
-          While ($Stoploop -eq $false)
-
-      - name: Run Tests
-        shell: cmd
-        run: |
-          cd docker/speedtests/
-          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
-          type out.log
-
-      - name: Stop Client
-        if: always()
-        shell: powershell
-        run: |
-          Get-Process qpep | Stop-Process
-
-      - name: Reset Proxy
-        if: always()
-        run: |
-          go run docker/speedtests/utils/reset_proxy_util.go
-
-      - uses: actions/upload-artifact@v3
-        with:
-          name: performance_tests_logs
-          path: "${{ github.workspace }}/**/*.log"
-
-      - name: Auto-cancel workflow on error
-        if: failure()
-        uses: andymckay/cancel-action@0.3
+##      - name: Set up Go
+##        uses: actions/setup-go@v3
+##        with:
+##          go-version: 1.18.10
+##
+#      - name: Prepare
+#        shell: powershell
+#        run: |
+#          New-Item -Path . -Name "build" -ItemType "directory" -Force
+#          New-Item -Path . -Name "build/config" -ItemType "directory" -Force
+#          $config = Get-Content -Path ./docker/client-env/qpep.yml.tpl
+#          $config = $config.replace('<QPEP_GATEWAY>',$env:REMOTE_GATEWAY)
+#          $config = $config.replace('<QPEP_ADDRESS>',$env:LISTEN_ADDRESS)
+#          $config > ./build/config/qpep.yml
+#          Copy-Item "./windivert/x64/*" -Destination "./build"
+#
+#      - name: Build Client
+#        shell: cmd
+#        run: |
+#          set CGO_ENABLED=1
+#          set GOOS=windows
+#          set GOHOSTARCH=amd64
+#          set GOHOSTOS=windows
+#          go build -v -o build/qpep.exe
+#
+#      - name: Run Client
+#        shell: cmd
+#        run: |
+#          cd build/
+#          cmd /c "START /b qpep.exe -c"
+#
+#      - name: Wait Server
+#        shell: powershell
+#        run: |
+#          $Stoploop = $false
+#          [ int ]$Retrycount = "10"
+#
+#           do {
+#            try {
+#              Write-Host "Echoing server..."
+#              Invoke-WebRequest -Uri "http://${{ inputs.server_public_address }}:444/api/v1/server/echo" -UseBasicParsing -TimeoutSec 1
+#              Write-Host "Job completed"
+#              $Stoploop = $true
+#            }
+#            catch {
+#              $Retrycount = $Retrycount - 1
+#              if ($Retrycount -gt 0){
+#                Start-Sleep -Seconds 10
+#              }
+#              else {
+#                Write-Error "Could not get server after 10 retries." -ErrorAction Stop
+#              }
+#            }
+#          }
+#          While ($Stoploop -eq $false)
+#
+#      - name: Run Tests
+#        shell: cmd
+#        run: |
+#          cd docker/speedtests/
+#          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
+#          type out.log
+#
+#      - name: Stop Client
+#        if: always()
+#        shell: powershell
+#        run: |
+#          Get-Process qpep | Stop-Process
+#
+#      - name: Reset Proxy
+#        if: always()
+#        run: |
+#          go run docker/speedtests/utils/reset_proxy_util.go
+#
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: performance_tests_logs
+#          path: "${{ github.workspace }}/**/*.log"
+#
+#      - name: Auto-cancel workflow on error
+#        if: failure()
+#        uses: andymckay/cancel-action@0.3
 
   run-server:
     runs-on: vm-server
