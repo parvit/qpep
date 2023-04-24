@@ -14,9 +14,14 @@ on:
         default: enp0s3
         required: true
       server_public_address:
-        description: 'address for the server'
+        description: 'public address for the server'
         type: string
         default: 35.163.142.7
+        required: true
+      server_private_address:
+        description: 'private address for the server'
+        type: string
+        default: 172.31.38.198
         required: true
       client_listen_address:
         description: 'address for the client to listen on'
@@ -93,9 +98,7 @@ jobs:
                 Start-Sleep -Seconds 1
               }
               else {
-                Write-Error "Could not get server after 3 retries." -Action Stop
-                $Stoploop = $true
-                
+                Write-Error "Could not get server after 3 retries." -ErrorAction Stop
               }
             }
           }
@@ -126,7 +129,7 @@ jobs:
   run-server:
     runs-on: vm-server
     env:
-      SERVER_PUBLIC_ADDRESS: ${{ inputs.server_public_address }}
+      SERVER_ADDRESS: ${{ inputs.server_private_address }}
       LISTEN_ADDRESS: 127.0.0.1
     steps:
       - uses: actions/checkout@v3
