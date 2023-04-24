@@ -99,7 +99,8 @@ func handleQuicStream(stream quic.Stream) {
 	if qpepHeader.DestAddr.Port == ServerConfiguration.APIPort {
 		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, ServerConfiguration.APIPort)
 	} else if qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION != 0 {
-		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, qpepHeader.DestAddr.Port)
+		logger.Info("Local connection to server")
+		destAddress = fmt.Sprintf("127.0.0.1:%d", qpepHeader.DestAddr.Port)
 	}
 
 	tskKey := fmt.Sprintf("TCP-Dial:%v", destAddress)
