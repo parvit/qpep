@@ -98,9 +98,6 @@ func handleQuicStream(stream quic.Stream) {
 	// To support the server being behind a private NAT (external gateway address != local listening address)
 	// we dial the listening address when the connection is directed at the non-local API server
 	destAddress := qpepHeader.DestAddr.String()
-	if qpepHeader.DestAddr.Port == ServerConfiguration.APIPort {
-		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, ServerConfiguration.APIPort)
-	}
 	if qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION != 0 {
 		logger.Info("[%d] Local connection to server", stream.StreamID())
 		destAddress = fmt.Sprintf("127.0.0.1:%d", qpepHeader.DestAddr.Port)
