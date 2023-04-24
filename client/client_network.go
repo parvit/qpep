@@ -320,13 +320,11 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 			Port: port,
 		}
 
-		logger.Info("a:%s / b:%s", header.DestAddr.IP.String(), ClientConfiguration.GatewayHost)
 		if header.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
 			header.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
 		}
-		logger.Info("Connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 
-		logger.Info("Proxied connection")
+		logger.Info("Proxied connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 		logger.Info("Sending QUIC header to server, SourceAddr: %v / DestAddr: %v", header.SourceAddr, header.DestAddr)
 		_, err := stream.Write(header.ToBytes())
 		if err != nil {
@@ -358,7 +356,7 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 		if header.DestAddr.IP.String() == ClientConfiguration.GatewayHost {
 			header.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
 		}
-		logger.Info("Connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
+		logger.Info("Proxied connection flags : %d %d", header.Flags, header.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 
 		t := http.Response{
 			Status:        http.StatusText(http.StatusOK),
