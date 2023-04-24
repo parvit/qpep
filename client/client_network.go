@@ -68,6 +68,7 @@ func handleTCPConn(tcpConn net.Conn) {
 	defer tcpConn.Close()
 
 	tcpSourceAddr := tcpConn.RemoteAddr().(*net.TCPAddr)
+	tcpLocalAddr := tcpConn.LocalAddr().(*net.TCPAddr)
 	diverted, srcPort, dstPort, srcAddress, dstAddress := windivert.GetConnectionStateData(tcpSourceAddr.Port)
 
 	var proxyRequest *http.Request
@@ -96,12 +97,14 @@ func handleTCPConn(tcpConn net.Conn) {
 	//Set our custom header to the QUIC session so the server can generate the correct TCP handshake on the other side
 	sessionHeader := shared.QPepHeader{
 		SourceAddr: tcpSourceAddr,
-		DestAddr:   tcpConn.LocalAddr().(*net.TCPAddr),
+		DestAddr:   tcpLocalAddr,
+		Flags:      0,
 	}
 
-	if tcpConn.RemoteAddr().String() == ClientConfiguration.GatewayHost {
+	if tcpLocalAddr.IP.String() == ClientConfiguration.GatewayHost {
 		sessionHeader.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
 	}
+	logger.Info("Connection flags : %d %d", sessionHeader.Flags, sessionHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
 
 	// divert check
 	if diverted == windivert.DIVERT_OK {

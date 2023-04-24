@@ -93,6 +93,8 @@ func handleQuicStream(stream quic.Stream) {
 		return
 	}
 
+	logger.Info("Connection flags : %d %d", qpepHeader.Flags, qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
+
 	// To support the server being behind a private NAT (external gateway address != local listening address)
 	// we dial the listening address when the connection is directed at the non-local API server
 	destAddress := qpepHeader.DestAddr.String()
