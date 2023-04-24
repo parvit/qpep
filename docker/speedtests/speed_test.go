@@ -6,6 +6,7 @@ import (
 	"github.com/parvit/qpep/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,13 +17,16 @@ import (
 
 var targetURL = flag.String("target_url", "", "url to download")
 var connections = flag.Int("connections_num", 1, "simultaneous tcp connections to make to the server")
+var expectedSize = flag.Int("expect_size", 1024*1024, "size of the target file")
 
 func TestSpeedTestsConfigSuite(t *testing.T) {
-	t.Log(*targetURL)
-	t.Log(*connections)
+	logger.Info("%v", *targetURL)
+	logger.Info("%v", *connections)
+	logger.Info("%v", *expectedSize)
 
 	assert.True(t, *connections > 0)
 	assert.True(t, len(*targetURL) > 0)
+	assert.True(t, *expectedSize > 0)
 
 	var q SpeedTestsConfigSuite
 	suite.Run(t, &q)
@@ -42,17 +46,33 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 	go func(id int) {
 		defer func() {
-			s.T().Logf("Executor #%d done\n", id)
+			logger.Info("Executor #%d done\n", id)
 			wg.Done()
 		}()
-		s.T().Logf("Starting executor #%d\n", id)
+		logger.Info("Starting executor #%d\n", id)
 
 		client := getClientForAPI(nil)
 		assert.NotNil(s.T(), client)
 		assert.NotNil(s.T(), targetURL)
 
-		_, err := client.Get(*targetURL)
+		logger.Info("GET request #%d", index)
+		resp, err := client.Get(*targetURL)
 		assert.Nil(s.T(), err)
+		if err != nil {
+			logger.Info("GET request failed #%d", index)
+			return
+		}
+		defer resp.Body.Close()
+
+		toRead := resp.ContentLength
+		for toRead > 0 {
+			var buff = make([]byte, 1024)
+			rd := io.LimitReader(resp.Body, 1024)
+			rd.Read(buff)
+
+			toRead -= int64(len(buff))
+		}
+		logger.Info("GET request done #%d", index)
 	}(index)
 
 	wg.Wait()

@@ -108,7 +108,7 @@ jobs:
 #        shell: cmd
 #        run: |
 #          cd docker/speedtests/
-#          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
+#          cmd /c "go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat -target_size 10485760 -connections_num ${{ matrix.connections_number }} -test.timeout 1m > out.log"
 #          type out.log
 #
 #      - name: Stop Client
@@ -168,7 +168,23 @@ jobs:
           cd docker/server-env/
           docker compose up -d
 
-      - name: Wait Tests
+      - name: Wait Tests 1
+        run: |
+          sleep 600
+
+      - name: Wait Tests 2
+        run: |
+          sleep 600
+
+      - name: Wait Tests 3
+        run: |
+          sleep 600
+
+      - name: Wait Tests 4
+        run: |
+          sleep 600
+
+      - name: Wait Tests 5
         run: |
           sleep 600
 
