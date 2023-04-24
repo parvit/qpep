@@ -93,21 +93,22 @@ func handleQuicStream(stream quic.Stream) {
 		return
 	}
 
-	logger.Info("Connection flags : %d %d", qpepHeader.Flags, qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION)
+	logger.Info("[%d] Connection flags : %d %v", stream.StreamID(), qpepHeader.Flags, qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION != 0)
 
 	// To support the server being behind a private NAT (external gateway address != local listening address)
 	// we dial the listening address when the connection is directed at the non-local API server
 	destAddress := qpepHeader.DestAddr.String()
 	if qpepHeader.DestAddr.Port == ServerConfiguration.APIPort {
 		destAddress = fmt.Sprintf("%s:%d", ServerConfiguration.ListenHost, ServerConfiguration.APIPort)
-	} else if qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION != 0 {
-		logger.Info("Local connection to server")
+	}
+	if qpepHeader.Flags&shared.QPEP_LOCALSERVER_DESTINATION != 0 {
+		logger.Info("[%d] Local connection to server", stream.StreamID())
 		destAddress = fmt.Sprintf("127.0.0.1:%d", qpepHeader.DestAddr.Port)
 	}
 
 	tskKey := fmt.Sprintf("TCP-Dial:%v", destAddress)
 	_, tsk := trace.NewTask(context.Background(), tskKey)
-	logger.Debug(">> Opening TCP Conn to dest:%s, src:%s\n", destAddress, qpepHeader.SourceAddr)
+	logger.Debug("[%d] >> Opening TCP Conn to dest:%s, src:%s\n", stream.StreamID(), destAddress, qpepHeader.SourceAddr)
 	dial := &net.Dialer{
 		LocalAddr:     &net.TCPAddr{IP: net.ParseIP(ServerConfiguration.ListenHost)},
 		Timeout:       shared.GetScaledTimeout(1, time.Second),
@@ -118,13 +119,13 @@ func handleQuicStream(stream quic.Stream) {
 	tcpConn, err := dial.Dial("tcp", destAddress)
 	tsk.End()
 	if err != nil {
-		logger.Error("Unable to open TCP connection from QPEP stream: %s\n", err)
+		logger.Error("[%d] Unable to open TCP connection from QPEP stream: %s\n", stream.StreamID(), err)
 		stream.Close()
 
 		shared.ScaleUpTimeout()
 		return
 	}
-	logger.Debug(">> Opened TCP Conn %s -> %s\n", qpepHeader.SourceAddr, destAddress)
+	logger.Debug(">> [%d] Opened TCP Conn %s -> %s\n", stream.StreamID(), qpepHeader.SourceAddr, destAddress)
 
 	trackedAddress := qpepHeader.SourceAddr.IP.String()
 	proxyAddress := tcpConn.LocalAddr().String()
