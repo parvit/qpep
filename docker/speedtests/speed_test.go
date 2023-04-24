@@ -42,38 +42,39 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	wg := &sync.WaitGroup{}
 	wg.Add(*connections)
 
-	index := 0
+	for index := 0; index < *connections; index++ {
+		go func(id int) {
+			defer func() {
+				logger.Info("Executor #%d done\n", id)
+				wg.Done()
+			}()
+			logger.Info("Starting executor #%d\n", id)
 
-	go func(id int) {
-		defer func() {
-			logger.Info("Executor #%d done\n", id)
-			wg.Done()
-		}()
-		logger.Info("Starting executor #%d\n", id)
+			client := getClientForAPI(nil)
+			assert.NotNil(s.T(), client)
+			assert.NotNil(s.T(), targetURL)
 
-		client := getClientForAPI(nil)
-		assert.NotNil(s.T(), client)
-		assert.NotNil(s.T(), targetURL)
+			logger.Info("GET request #%d", id)
+			resp, err := client.Get(*targetURL)
+			assert.Nil(s.T(), err)
+			if err != nil {
+				logger.Info("GET request failed #%d", id)
+				return
+			}
+			defer resp.Body.Close()
 
-		logger.Info("GET request #%d", index)
-		resp, err := client.Get(*targetURL)
-		assert.Nil(s.T(), err)
-		if err != nil {
-			logger.Info("GET request failed #%d", index)
-			return
-		}
-		defer resp.Body.Close()
+			toRead := resp.ContentLength
+			for toRead > 0 {
+				var buff = make([]byte, 1024)
+				rd := io.LimitReader(resp.Body, 1024)
+				rd.Read(buff)
 
-		toRead := resp.ContentLength
-		for toRead > 0 {
-			var buff = make([]byte, 1024)
-			rd := io.LimitReader(resp.Body, 1024)
-			rd.Read(buff)
-
-			toRead -= int64(len(buff))
-		}
-		logger.Info("GET request done #%d", index)
-	}(index)
+				toRead -= int64(len(buff))
+				logger.Info("#%d to read: %d", id, toRead)
+			}
+			logger.Info("GET request done #%d", id)
+		}(index)
+	}
 
 	wg.Wait()
 }

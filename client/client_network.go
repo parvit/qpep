@@ -99,6 +99,10 @@ func handleTCPConn(tcpConn net.Conn) {
 		DestAddr:   tcpConn.LocalAddr().(*net.TCPAddr),
 	}
 
+	if tcpConn.RemoteAddr().String() == ClientConfiguration.GatewayHost {
+		sessionHeader.Flags |= shared.QPEP_LOCALSERVER_DESTINATION
+	}
+
 	// divert check
 	if diverted == windivert.DIVERT_OK {
 		logger.Info("Diverted connection: %v:%v %v:%v", srcAddress, srcPort, dstAddress, dstPort)
