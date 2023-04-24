@@ -193,9 +193,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: performance_tests_output
-          path:
-            - "${{ github.workspace }}/**/data.csv"
-            - "${{ github.workspace }}/**/*.log"
+          path: "${{ github.workspace }}/**/data.csv"
 
       - name: Auto-cancel workflow on error
         if: failure()
