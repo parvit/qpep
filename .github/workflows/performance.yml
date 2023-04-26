@@ -30,7 +30,7 @@ on:
         required: true
       remove_qpep_image:
         description: 'remove qpep image at end of run'
-        type: bool
+        type: boolean
         default: false
         required: true
 
