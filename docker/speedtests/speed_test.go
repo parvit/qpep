@@ -17,7 +17,7 @@ import (
 
 var targetURL = flag.String("target_url", "", "url to download")
 var connections = flag.Int("connections_num", 1, "simultaneous tcp connections to make to the server")
-var expectedSize = flag.Int("expect_size", 1024*1024, "size of the target file")
+var expectedSize = flag.Int("expect_mb", 10, "size in MBs of the target file")
 
 func TestSpeedTestsConfigSuite(t *testing.T) {
 	logger.Info("%v", *targetURL)
@@ -27,6 +27,8 @@ func TestSpeedTestsConfigSuite(t *testing.T) {
 	assert.True(t, *connections > 0)
 	assert.True(t, len(*targetURL) > 0)
 	assert.True(t, *expectedSize > 0)
+
+	*expectedSize = 1024 * 1024 * *expectedSize
 
 	var q SpeedTestsConfigSuite
 	suite.Run(t, &q)
@@ -65,17 +67,23 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			toRead := resp.ContentLength
 			if toRead != int64(*expectedSize) {
-				assert.Fail(s.T(), "No response")
+				assert.Fail(s.T(), "No response / wrong response")
 				return
 			}
 
+			var counter = 10
 			for toRead > 0 {
 				var buff = make([]byte, 1024)
 				rd := io.LimitReader(resp.Body, 1024)
 				rd.Read(buff)
 
 				toRead -= int64(len(buff))
-				logger.Info("#%d to read: %d", id, toRead)
+				if counter > 0 {
+					counter--
+					continue
+				}
+				counter = 10
+				logger.Info("#%d bytes to read: %d", id, toRead)
 			}
 			logger.Info("GET request done #%d", id)
 		}(index)
