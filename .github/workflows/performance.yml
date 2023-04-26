@@ -137,7 +137,13 @@ jobs:
       SERVER_ADDRESS: ${{ inputs.server_private_address }}
       LISTEN_ADDRESS: 127.0.0.1
     steps:
+      - name: Pre-Cleanup
+        run: |
+          sudo rm -rf docker/server-data-env/output/* || true
+
       - uses: actions/checkout@v3
+        with:
+          clean: true
 
       - name: Set up Go
         uses: actions/setup-go@v3
