@@ -156,10 +156,6 @@ jobs:
         with:
           go-version: 1.18.10
 
-      - name: Set connection delay
-        run: |
-          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
-
       - name: Build Server
         run: |
           docker version
@@ -179,6 +175,10 @@ jobs:
         run: |
           cd docker/server-env/
           docker compose up -d
+
+      - name: Set connection delay
+        run: |
+          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
 
       - name: Wait Tests
         run: |
