@@ -27,6 +27,8 @@ import (
 
 const (
 	BUFFER_SIZE = 512 * 1024
+
+	ACTIVITY_FLAG = "activity"
 )
 
 var (
@@ -133,12 +135,12 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	//Proxy all stream content from quic to TCP and from TCP to quic
 	logger.Info("== Stream %d Start ==", quicStream.StreamID())
+	var activityFlag = false
+	ctx = context.WithValue(ctx, ACTIVITY_FLAG, &activityFlag)
+
 	go handleTcpToQuic(ctx, &streamWait, quicStream, tcpConn)
 	go handleQuicToTcp(ctx, &streamWait, tcpConn, quicStream)
-	go func() {
-		<-time.After(shared.GetScaledTimeout(10, time.Second))
-		cancel()
-	}()
+	go connectionActivityTimer(&activityFlag, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying
 	streamWait.Wait()
@@ -155,6 +157,15 @@ func handleTCPConn(tcpConn net.Conn) {
 		// destroy the session so a new one is created next time
 		quicSession = nil
 	}
+}
+
+func connectionActivityTimer(flag *bool, cancelFunc context.CancelFunc) {
+	<-time.After(shared.GetScaledTimeout(10, time.Second))
+	if *flag {
+		cancelFunc()
+		return
+	}
+	go connectionActivityTimer(flag, cancelFunc)
 }
 
 // getQuicStream method handles the opening or reutilization of the quic session, and launches a new
@@ -398,6 +409,11 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		streamWait.Done()
 	}()
 
+	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	if !ok {
+		panic("No activity flag set")
+	}
+
 	setLinger(src)
 
 	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
@@ -421,10 +437,12 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
+				*activityFlag = false
 				continue
 			}
 			return
 		}
+		*activityFlag = true
 	}
 	//logger.Info("Finished Copying TCP Conn %s->%s, Stream ID %d\n", src.LocalAddr().String(), src.RemoteAddr().String(), dst.StreamID())
 }
@@ -439,6 +457,11 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		tsk.End()
 		streamWait.Done()
 	}()
+
+	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	if !ok {
+		panic("No activity flag set")
+	}
 
 	setLinger(dst)
 
@@ -465,10 +488,12 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
+				*activityFlag = false
 				continue
 			}
 			return
 		}
+		*activityFlag = true
 	}
 	//logger.Info("Finished Copying Stream ID %d, TCP Conn %s->%s\n", srcConn.StreamID(), dst.LocalAddr().String(), dst.RemoteAddr().String())
 }
