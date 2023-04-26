@@ -214,7 +214,9 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		}
 		tsk.End()
 
-		go api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
+		if written > 0 {
+			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
+		}
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
@@ -278,7 +280,9 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		}
 		tsk.End()
 
-		go api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
+		if written > 0 {
+			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
+		}
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
