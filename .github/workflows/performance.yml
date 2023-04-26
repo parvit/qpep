@@ -28,6 +28,11 @@ on:
         type: string
         default: 192.168.1.21
         required: true
+      remove_qpep_image:
+        description: 'remove qpep image at end of run'
+        type: bool
+        default: false
+        required: true
 
 run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
@@ -201,6 +206,10 @@ jobs:
         run: |
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
           sudo rm -rf docker/server-data-env/output/* || true
+
+      - name: Remove server image
+        if: ${{ inputs.remove_qpep_image }}
+        run: |
           docker image rm project-faster/qpep_server || true
 
       - name: Auto-cancel workflow on error
