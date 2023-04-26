@@ -95,12 +95,12 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 func getClientForAPI(localAddr net.Addr) *http.Client {
 	dialer := &net.Dialer{
 		LocalAddr: localAddr,
-		Timeout:   2 * time.Second,
+		Timeout:   10 * time.Second,
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
 	return &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 120 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
 				shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
@@ -111,7 +111,7 @@ func getClientForAPI(localAddr net.Addr) *http.Client {
 				return nil, nil
 			},
 			DialContext:     dialer.DialContext,
-			MaxIdleConns:    1,
+			MaxIdleConns:    0,
 			IdleConnTimeout: 10 * time.Second,
 			//TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
