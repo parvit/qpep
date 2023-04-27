@@ -55,7 +55,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 	lock := &sync.Mutex{}
 
-	fmt.Fprint(f, "timestamp,event,value\n")
+	fmt.Fprintf(f, "timestamp,event,value\n")
 
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
@@ -99,7 +99,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
 					lock.Lock()
-					fmt.Fprint(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
+					fmt.Fprintf(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
 					lock.Unlock()
 					totalBytesInTimeDelta = 0
 				}
@@ -109,7 +109,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
 				lock.Lock()
-				fmt.Fprint(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
+				fmt.Fprintf(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
 				lock.Unlock()
 			}
 			logger.Info("GET request done #%d", id)
