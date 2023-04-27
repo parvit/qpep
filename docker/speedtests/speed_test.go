@@ -1,7 +1,6 @@
 package speedtests
 
 import (
-	"encoding/csv"
 	"flag"
 	"fmt"
 	"github.com/parvit/qpep/logger"
@@ -54,13 +53,9 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 		_ = f.Close()
 	}()
 
-	w := csv.NewWriter(f)
-	w.Comma = ','
-	w.UseCRLF = false
-
 	lock := &sync.Mutex{}
 
-	_ = w.Write([]string{"timestamp", "event", "value"})
+	fmt.Fprint(f, "timestamp,event,value\n")
 
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
@@ -104,11 +99,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
 					lock.Lock()
-					_ = w.Write([]string{
-						start.Format(time.RFC3339Nano),
-						eventTag,
-						fmt.Sprintf("%d", totalBytesInTimeDelta),
-					})
+					fmt.Fprint(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
 					lock.Unlock()
 					totalBytesInTimeDelta = 0
 				}
@@ -118,11 +109,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
 				lock.Lock()
-				_ = w.Write([]string{
-					start.Format(time.RFC3339Nano),
-					eventTag,
-					fmt.Sprintf("%d", totalBytesInTimeDelta),
-				})
+				fmt.Fprint(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
 				lock.Unlock()
 			}
 			logger.Info("GET request done #%d", id)
@@ -130,8 +117,6 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	}
 
 	wg.Wait()
-
-	w.Flush()
 }
 
 func getClientForAPI(localAddr net.Addr) *http.Client {
