@@ -132,15 +132,18 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: results_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
-          path: |
-            "${{ github.workspace }}/**/*.csv"
-            "${{ github.workspace }}/**/*.png"
+          name: data_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
+          path: "${{ github.workspace }}/**/*.csv"
 
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: performance_tests_logs
-#          path: "${{ github.workspace }}/**/*.log"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: plots_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
+          path: "${{ github.workspace }}/**/*.png"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: logs_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
+          path: "${{ github.workspace }}/**/*.log"
 
       - name: Auto-cancel workflow on error
         if: failure()
@@ -207,17 +210,20 @@ jobs:
           cd docker/server-data-env/
           docker compose down -v
 
-      - name: Generate results
-        run: |
-          go run docker/speedtests/utils/plotter.go docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
+#      - name: Generate results
+#        run: |
+#          go run docker/speedtests/utils/plotter.go docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: performance_tests_output
-          path: |
-            "${{ github.workspace }}/**/*.csv"
-            "${{ github.workspace }}/**/*.png"
-
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: test_output
+#          path: "${{ github.workspace }}/**/*.csv"
+#
+#      - uses: actions/upload-artifact@v3
+#        with:
+#          name: test_plot
+#          path: "${{ github.workspace }}/**/*.png"
+#
       - name: Cleanup
         if: always()
         run: |
