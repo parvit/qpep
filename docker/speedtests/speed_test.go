@@ -47,7 +47,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	wg := &sync.WaitGroup{}
 	wg.Add(*connections)
 
-	f, err := os.Create("output_%d_%d.csv")
+	f, err := os.Create("output.csv")
 	assert.Nil(s.T(), err)
 	defer func() {
 		_ = f.Sync()
