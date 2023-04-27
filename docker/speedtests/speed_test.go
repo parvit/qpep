@@ -58,6 +58,8 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	w.Comma = ','
 	w.UseCRLF = false
 
+	lock := &sync.Mutex{}
+
 	_ = w.Write([]string{"timestamp", "event", "value"})
 
 	for index := 0; index < *connections; index++ {
@@ -98,24 +100,30 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 				totalBytesInTimeDelta += int64(len(buff))
 				toRead -= int64(len(buff))
-				if time.Now().Sub(start) > 1*time.Second {
+				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
+					lock.Lock()
 					_ = w.Write([]string{
 						start.Format(time.RFC3339Nano),
 						eventTag,
 						fmt.Sprintf("%d", totalBytesInTimeDelta),
 					})
+					lock.Unlock()
 					totalBytesInTimeDelta = 0
 				}
+
+				time.Sleep(1 * time.Millisecond)
 			}
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
+				lock.Lock()
 				_ = w.Write([]string{
 					start.Format(time.RFC3339Nano),
 					eventTag,
 					fmt.Sprintf("%d", totalBytesInTimeDelta),
 				})
+				lock.Unlock()
 			}
 			logger.Info("GET request done #%d", id)
 		}(index)
