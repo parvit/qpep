@@ -198,6 +198,8 @@ jobs:
         run: |
           cd docker/server-env/
           docker compose down -v
+          cd output/
+          dir
 
       - name: Stop Data Server Container
         if: always()
@@ -207,7 +209,7 @@ jobs:
 
       - name: Generate results
         run: |
-          go run docker/speedtests/utils/plotter.go docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ inputs.download_size }}M][Connections:${{ inputs.connections_number }}]" "perf-dw-speed"
+          go run docker/speedtests/utils/plotter.go docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
 
       - uses: actions/upload-artifact@v3
         with:

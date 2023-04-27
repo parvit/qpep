@@ -130,6 +130,8 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	}
 
 	wg.Wait()
+
+	w.Flush()
 }
 
 func getClientForAPI(localAddr net.Addr) *http.Client {
