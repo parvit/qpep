@@ -1,7 +1,9 @@
 package speedtests
 
 import (
+	"encoding/csv"
 	"flag"
+	"fmt"
 	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -44,6 +47,19 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	wg := &sync.WaitGroup{}
 	wg.Add(*connections)
 
+	f, err := os.Create("output_%d_%d.csv")
+	assert.Nil(s.T(), err)
+	defer func() {
+		_ = f.Sync()
+		_ = f.Close()
+	}()
+
+	w := csv.NewWriter(f)
+	w.Comma = ','
+	w.UseCRLF = false
+
+	_ = w.Write([]string{"timestamp", "event", "value"})
+
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
 			defer func() {
@@ -71,19 +87,35 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				return
 			}
 
-			var counter = 10
+			var eventTag = fmt.Sprintf("conn-%d-speed", id)
+
+			var totalBytesInTimeDelta int64 = 0
+			var start = time.Now()
 			for toRead > 0 {
 				var buff = make([]byte, 1024)
 				rd := io.LimitReader(resp.Body, 1024)
 				rd.Read(buff)
 
+				totalBytesInTimeDelta += int64(len(buff))
 				toRead -= int64(len(buff))
-				if counter > 0 {
-					counter--
-					continue
+				if time.Now().Sub(start) > 1*time.Second {
+					start = time.Now()
+					logger.Info("#%d bytes to read: %d", id, toRead)
+					_ = w.Write([]string{
+						start.Format(time.RFC3339Nano),
+						eventTag,
+						fmt.Sprintf("%d", totalBytesInTimeDelta),
+					})
+					totalBytesInTimeDelta = 0
 				}
-				counter = 10
-				logger.Info("#%d bytes to read: %d", id, toRead)
+			}
+			if totalBytesInTimeDelta > 0 {
+				start = time.Now()
+				_ = w.Write([]string{
+					start.Format(time.RFC3339Nano),
+					eventTag,
+					fmt.Sprintf("%d", totalBytesInTimeDelta),
+				})
 			}
 			logger.Info("GET request done #%d", id)
 		}(index)
