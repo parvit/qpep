@@ -214,6 +214,7 @@ jobs:
         run: |
           cd docker/speedtests/
           go run utils/plotter.go ${{ github.workspace }}/docker/server-data-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
+          mv data.png ${{ github.workspace }}/docker/speedtests/data.png
 
       - uses: actions/upload-artifact@v3
         with:
@@ -223,7 +224,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: plot_${{ inputs.connection_delay_ms }}
-          path: "${{ github.workspace }}/docker/speedtests/data.png"
+          path: "${{ github.workspace }}/docker/server-data-env/output/data.png"
 
       - name: Cleanup
         if: always()
