@@ -55,7 +55,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 	lock := &sync.Mutex{}
 
-	fmt.Fprintf(f, "timestamp,event,value\n")
+	f.WriteString("timestamp,event,value\n")
 
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
@@ -84,6 +84,8 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				return
 			}
 
+			var events = make([]string, 0, 256)
+
 			var eventTag = fmt.Sprintf("conn-%d-speed", id)
 
 			var totalBytesInTimeDelta int64 = 0
@@ -98,9 +100,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
-					lock.Lock()
-					fmt.Fprintf(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
-					lock.Unlock()
+					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
 					totalBytesInTimeDelta = 0
 				}
 
@@ -108,11 +108,16 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			}
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
-				lock.Lock()
-				fmt.Fprintf(f, "%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta)
-				lock.Unlock()
+				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
 			}
-			logger.Info("GET request done #%d", id)
+
+			logger.Info("#%d GET request done, dumping to CSV...", id)
+			lock.Lock()
+			defer lock.Unlock()
+			for _, ev := range events {
+				f.WriteString(ev)
+			}
+			logger.Info("#%d done", id)
 		}(index)
 	}
 

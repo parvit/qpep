@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
-	"image/color"
 	"log"
 	"os"
 	"regexp"
@@ -13,8 +11,8 @@ import (
 
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
 	"gonum.org/v1/plot/vg"
-	"gonum.org/v1/plot/vg/draw"
 )
 
 func main() {
@@ -89,14 +87,14 @@ func main() {
 		})
 	}
 
-	fmt.Printf("ordering data\n")
+	log.Printf("ordering data\n")
 	for _, tag := range connections {
 		sort.SliceStable(traces[tag], func(i, j int) bool {
 			return traces[tag][i].X < traces[tag][j].X
 		})
 	}
 
-	fmt.Printf("start plotter\n")
+	log.Printf("start plotter\n")
 	p := plot.New()
 	p.Title.Text = title
 	p.X.Tick.Marker = xticks
@@ -104,33 +102,24 @@ func main() {
 	p.Y.Label.Text = "Connection download speed (KB/s)"
 	p.Add(plotter.NewGrid())
 
+	// sort traces
 	sort.Strings(connections)
 
-	//legend := plot.NewLegend()
-	//legend.Padding = vg.Millimeter
-	//legend.YPosition = draw.PosTop
-	//
+	// trace initializers
+	var traceData = make([]interface{}, 0, len(connections))
+
+	log.Printf("add traces\n")
 	for _, key := range connections {
-		fmt.Printf("add trace %v\n", key)
-		line, points, err := plotter.NewLinePoints(traces[key])
-		if err != nil {
-			log.Panic(err)
-		}
-
-		line.Color = color.RGBA{G: 255, A: 255}
-		points.Shape = draw.CircleGlyph{}
-		points.Color = color.RGBA{R: 255, A: 255}
-
-		//legend.Add("")
-
-		p.Add(line, points)
-		fmt.Printf("added trace %v\n", key)
+		log.Printf("%s size: %d\n", key, len(traces[key]))
+		traceData = append(traceData, key, traces[key])
 	}
 
-	fmt.Printf("saving\n")
-	err = p.Save(50*vg.Centimeter, 40*vg.Centimeter, "data.png")
+	plotutil.AddLinePoints(p, traceData...)
+
+	log.Printf("saving\n")
+	err = p.Save(70*vg.Centimeter, 40*vg.Centimeter, "data.png")
 	if err != nil {
 		log.Panic(err)
 	}
-	fmt.Printf("done\n")
+	log.Printf("done\n")
 }
