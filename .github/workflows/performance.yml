@@ -212,20 +212,18 @@ jobs:
 
       - name: Generate results
         run: |
-          cd ${{ github.workspace }}/
-          find . | grep csv
           cd docker/speedtests/
-          go run utils/plotter.go ${{ github.workspace }}/docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
+          go run utils/plotter.go ${{ github.workspace }}/docker/server-data-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: test_output
-          path: "${{ github.workspace }}/**/*.csv"
+          name: data_${{ inputs.connection_delay_ms }}ms
+          path: "${{ github.workspace }}/docker/server-data-env/output/data.csv"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: test_plot
-          path: "${{ github.workspace }}/**/data.png"
+          name: plot_${{ inputs.connection_delay_ms }}
+          path: "${{ github.workspace }}/docker/speedtests/data.png"
 
       - name: Cleanup
         if: always()
