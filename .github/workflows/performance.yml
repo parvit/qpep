@@ -212,6 +212,8 @@ jobs:
 
       - name: Generate results
         run: |
+          cd ${{ github.workspace }}/
+          find . | grep csv
           cd docker/speedtests/
           go run utils/plotter.go ${{ github.workspace }}/docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
 
@@ -239,12 +241,3 @@ jobs:
       - name: Auto-cancel workflow on error
         if: failure()
         uses: andymckay/cancel-action@0.3
-
-#  check:
-#    needs: [ stop-data-server, run-client, run-server ]
-#    runs-on: vm-server
-#    steps:
-#      - name: Final Check
-#        run: |
-#          echo Check Results!
-#          sleep 2
