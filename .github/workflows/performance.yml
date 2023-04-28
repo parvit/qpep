@@ -214,7 +214,7 @@ jobs:
         run: |
           cd docker/speedtests/
           go run utils/plotter.go ${{ github.workspace }}/docker/server-data-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
-          mv data.png ${{ github.workspace }}/docker/speedtests/data.png
+          mv data.png ${{ github.workspace }}/docker/server-data-env/output/data.png
 
       - uses: actions/upload-artifact@v3
         with:
