@@ -29,6 +29,8 @@ const (
 	BUFFER_SIZE = 512 * 1024
 
 	ACTIVITY_FLAG = "activity"
+
+	LOCAL_RECONNECTION_RETRIES = 10
 )
 
 var (
@@ -554,7 +556,7 @@ func openQuicSession() (quic.Connection, error) {
 	quicClientConfig := shared.GetQuicConfiguration()
 
 	logger.Info("Dialing QUIC Session: %s\n", gatewayPath)
-	for i := 0; i < ClientConfiguration.MaxConnectionRetries; i++ {
+	for i := 0; i < LOCAL_RECONNECTION_RETRIES; i++ {
 		_, tsk := trace.NewTask(context.Background(), fmt.Sprintf("DialQuic-"+gatewayPath+"-%d", i))
 		session, err = quic.DialAddr(gatewayPath, tlsConf, quicClientConfig)
 		tsk.End()
@@ -563,11 +565,11 @@ func openQuicSession() (quic.Connection, error) {
 			logger.Info("QUIC Session Open\n")
 			return session, nil
 		}
-		logger.Info("Failed to Open QUIC Session: %s, retrying...\n", err)
 
-		<-time.After(1 * time.Second)
+		logger.Error("Failed to Open QUIC Session: %s, retrying...\n", err)
+		<-time.After(100 * time.Millisecond)
 	}
 
-	logger.Error("Max Retries Exceeded. Unable to Open QUIC Session: %s\n", err)
+	logger.Error("Unable to Open QUIC Session(Max Retries Exceeded): %v\n", err)
 	return nil, shared.ErrFailedGatewayConnect
 }

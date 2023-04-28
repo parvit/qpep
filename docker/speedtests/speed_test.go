@@ -95,6 +95,10 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			for toRead > 0 {
 				rd := io.LimitReader(resp.Body, 1024)
 				read, _ := rd.Read(buff)
+				if read == 0 {
+					<-time.After(10 * time.Millisecond)
+					continue
+				}
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)

@@ -12,7 +12,7 @@ ackdelay: 25
 congestion: 4
 decimate: 4
 decimatetime: 100
-maxretries: 100
+maxretries: 50
 multistream: true
 verbose: false
 preferproxy: true
