@@ -90,21 +90,20 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			var totalBytesInTimeDelta int64 = 0
 			var start = time.Now()
-			for toRead > 0 {
-				var buff = make([]byte, 1024)
-				rd := io.LimitReader(resp.Body, 1024)
-				rd.Read(buff)
+			var buff = make([]byte, 1024)
 
-				totalBytesInTimeDelta += int64(len(buff))
-				toRead -= int64(len(buff))
+			for toRead > 0 {
+				rd := io.LimitReader(resp.Body, 1024)
+				read, _ := rd.Read(buff)
+
+				totalBytesInTimeDelta += int64(read)
+				toRead -= int64(read)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
 					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
 					totalBytesInTimeDelta = 0
 				}
-
-				time.Sleep(1 * time.Millisecond)
 			}
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()

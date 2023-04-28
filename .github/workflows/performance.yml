@@ -116,7 +116,7 @@ jobs:
           go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat ^
              -expect_mb ${{ matrix.download_size }} -connections_num ${{ matrix.connections_number }} ^
              -test.v -test.timeout 5m
-          go run utils/plotter.go output.csv "Client speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ inputs.download_size }}M][Connections:${{ inputs.connections_number }}]"
+          go run utils/plotter.go output.csv "Client speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ matrix.download_size }}M][Connections:${{ matrix.connections_number }}]"
           dir
 
       - name: Stop Client
@@ -132,17 +132,17 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: data_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
+          name: data_client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
           path: "${{ github.workspace }}/**/*.csv"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: plots_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
-          path: "${{ github.workspace }}/**/*.png"
+          name: plots_client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
+          path: "${{ github.workspace }}/**/data.png"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: logs_client_${{ inputs.connection_delay_ms }}_${{ inputs.download_size }}_${{ inputs.connections_number }}
+          name: logs_client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
           path: "${{ github.workspace }}/**/*.log"
 
       - name: Auto-cancel workflow on error
@@ -210,20 +210,21 @@ jobs:
           cd docker/server-data-env/
           docker compose down -v
 
-#      - name: Generate results
-#        run: |
-#          go run docker/speedtests/utils/plotter.go docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
+      - name: Generate results
+        run: |
+          cd docker/speedtests/
+          go run utils/plotter.go ${{ github.workspace }}/docker/server-env/output/data.csv "Server speed test [Delay:${{ inputs.connection_delay_ms }}ms]" "perf-dw-speed"
 
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: test_output
-#          path: "${{ github.workspace }}/**/*.csv"
-#
-#      - uses: actions/upload-artifact@v3
-#        with:
-#          name: test_plot
-#          path: "${{ github.workspace }}/**/*.png"
-#
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test_output
+          path: "${{ github.workspace }}/**/*.csv"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: test_plot
+          path: "${{ github.workspace }}/**/data.png"
+
       - name: Cleanup
         if: always()
         run: |
