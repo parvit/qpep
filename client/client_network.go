@@ -563,7 +563,9 @@ func openQuicSession() (quic.Connection, error) {
 			logger.Info("QUIC Session Open\n")
 			return session, nil
 		}
-		logger.Info("Failed to Open QUIC Session: %s\n    Retrying...\n", err)
+		logger.Info("Failed to Open QUIC Session: %s, retrying...\n", err)
+
+		<-time.After(1 * time.Second)
 	}
 
 	logger.Error("Max Retries Exceeded. Unable to Open QUIC Session: %s\n", err)
