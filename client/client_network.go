@@ -174,7 +174,7 @@ func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFu
 	if flag_tx == nil || flag_rx == nil {
 		return
 	}
-	<-time.After(shared.GetScaledTimeout(1, time.Second))
+	<-time.After(ClientConfiguration.IdleTimeout)
 	logger.Debug("activity state: %v / %v", *flag_rx, *flag_tx)
 	if !*flag_rx && !*flag_tx {
 		cancelFunc()

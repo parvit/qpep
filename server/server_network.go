@@ -76,6 +76,19 @@ func listenQuicConn(quicSession quic.Connection) {
 	}
 }
 
+func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
+	if flag_tx == nil || flag_rx == nil {
+		return
+	}
+	<-time.After(ServerConfiguration.IdleTimeout)
+	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
+	if !*flag_rx && !*flag_tx {
+		cancelFunc()
+		return
+	}
+	go connectionActivityTimer(flag_rx, flag_tx, cancelFunc)
+}
+
 // handleQuicStream handles a quic stream connection and bridges to the standard tcp for the common internet
 func handleQuicStream(quicStream quic.Stream) {
 	defer func() {
@@ -168,19 +181,6 @@ func handleQuicStream(quicStream quic.Stream) {
 	quicStream.CancelWrite(0)
 	quicStream.Close()
 	tcpConn.Close()
-}
-
-func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
-	if flag_tx == nil || flag_rx == nil {
-		return
-	}
-	<-time.After(shared.GetScaledTimeout(1, time.Second))
-	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
-	if !*flag_rx && !*flag_tx {
-		cancelFunc()
-		return
-	}
-	go connectionActivityTimer(flag_rx, flag_tx, cancelFunc)
 }
 
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit int64,
