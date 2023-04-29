@@ -88,7 +88,7 @@ func handleTCPConn(tcpConn net.Conn) {
 		logger.OnError(errProxy, "opening proxy connection")
 	}
 
-	ctx, _ /*cancel*/ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var quicStream, err = getQuicStream(ctx)
 	if err != nil {
@@ -149,7 +149,7 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	go handleTcpToQuic(ctx, &streamWait, quicStream, tcpConn)
 	go handleQuicToTcp(ctx, &streamWait, tcpConn, quicStream)
-	//go connectionActivityTimer(&activityRX, &activityTX, cancel)
+	go connectionActivityTimer(&activityRX, &activityTX, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying
 	logger.Info("== Stream %d Wait ==", quicStream.StreamID())

@@ -154,7 +154,7 @@ func handleQuicStream(quicStream quic.Stream) {
 		api.Statistics.DecrementCounter(1.0, api.TOTAL_CONNECTIONS)
 	}()
 
-	ctx, _ /*cancel*/ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	var streamWait sync.WaitGroup
 	streamWait.Add(2)
@@ -170,7 +170,7 @@ func handleQuicStream(quicStream quic.Stream) {
 
 	go handleQuicToTcp(ctx, &streamWait, srcLimit, tcpConn, quicStream, proxyAddress, trackedAddress)
 	go handleTcpToQuic(ctx, &streamWait, dstLimit, quicStream, tcpConn, trackedAddress)
-	//go connectionActivityTimer(&activityRX, &activityTX, cancel)
+	go connectionActivityTimer(&activityRX, &activityTX, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying or timeout
 	logger.Info("== Stream %d Wait ==", quicStream.StreamID())
