@@ -16,6 +16,8 @@ import (
 )
 
 const (
+	BUFFER_SIZE = 10 * 1024 * 1024
+
 	ACTIVITY_RX_FLAG = "activity_rx"
 	ACTIVITY_TX_FLAG = "activity_tx"
 )
@@ -147,6 +149,11 @@ func handleQuicStream(quicStream quic.Stream) {
 	var activityRX, activityTX = false, false
 	ctx = context.WithValue(ctx, ACTIVITY_RX_FLAG, &activityRX)
 	ctx = context.WithValue(ctx, ACTIVITY_TX_FLAG, &activityTX)
+	defer func() {
+		// terminate activity timer
+		activityTX = false
+		activityRX = false
+	}()
 
 	go handleQuicToTcp(ctx, &streamWait, srcLimit, tcpConn, quicStream, proxyAddress, trackedAddress)
 	go handleTcpToQuic(ctx, &streamWait, dstLimit, quicStream, tcpConn, trackedAddress)
@@ -164,6 +171,9 @@ func handleQuicStream(quicStream quic.Stream) {
 }
 
 func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
+	if flag_tx == nil || flag_rx == nil {
+		return
+	}
 	<-time.After(shared.GetScaledTimeout(1, time.Second))
 	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
 	if !*flag_rx && !*flag_tx {
@@ -172,10 +182,6 @@ func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFu
 	}
 	go connectionActivityTimer(flag_rx, flag_tx, cancelFunc)
 }
-
-const (
-	BUFFER_SIZE = 512 * 1024
-)
 
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit int64,
 	dst net.Conn, src quic.Stream, proxyAddress, trackedAddress string) {
