@@ -128,8 +128,8 @@ func handleQuicStream(quicStream quic.Stream) {
 	logger.Debug("[%d] >> Opening TCP Conn to dest:%s, src:%s\n", quicStream.StreamID(), destAddress, qpepHeader.SourceAddr)
 	dial := &net.Dialer{
 		LocalAddr:     &net.TCPAddr{IP: net.ParseIP(ServerConfiguration.ListenHost)},
-		Timeout:       shared.GetScaledTimeout(1, time.Second),
-		KeepAlive:     shared.GetScaledTimeout(3, time.Second),
+		Timeout:       shared.GetScaledTimeout(10, time.Second),
+		KeepAlive:     shared.GetScaledTimeout(15, time.Second),
 		DualStack:     true,
 		FallbackDelay: 10 * time.Millisecond,
 	}
@@ -246,21 +246,17 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 		}
 
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
 		if err != nil {
-			if written > 0 {
-				*activityFlag = true
-				continue
-			}
+			logger.Error("err q->t: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
-			return
-		}
-		if written > 0 {
-			*activityFlag = true
-			continue
 		}
 		return
 	}
@@ -327,21 +323,17 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
 		}
 
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
 		if err != nil {
-			if written > 0 {
-				*activityFlag = true
-				continue
-			}
+			logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
-			return
-		}
-		if written > 0 {
-			*activityFlag = true
-			continue
 		}
 		return
 	}

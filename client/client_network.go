@@ -451,21 +451,16 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
 		tsk.End()
 
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
 		if err != nil {
-			if written > 0 {
-				*activityFlag = true
-				continue
-			}
+			logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
 			}
-			//logger.Info("finish q -> t: %v", src.StreamID())
-			return
-		}
-		if written > 0 {
-			*activityFlag = true
-			continue
 		}
 		return
 	}
@@ -512,21 +507,17 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		logger.Debug("q -> t: %d", written)
 		tsk.End()
 
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
 		if err != nil {
-			if written > 0 {
-				*activityFlag = true
-				continue
-			}
+			logger.Error("err q->t: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
-			return
-		}
-		if written > 0 {
-			*activityFlag = true
-			continue
 		}
 		return
 	}
