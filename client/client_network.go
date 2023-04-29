@@ -451,8 +451,9 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
 		tsk.End()
 
+		logger.Info("[%v] err: %v, written: %d\n", dst.StreamID(), err, written)
 		if err != nil || written == 0 {
-			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
+			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
 			}

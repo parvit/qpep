@@ -246,6 +246,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 		}
 
+		logger.Info("[%v] err: %v, written: %d\n", src.StreamID(), err, written)
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
