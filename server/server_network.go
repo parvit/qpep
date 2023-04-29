@@ -190,6 +190,11 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 	api.Statistics.SetMappedAddress(proxyAddress, trackedAddress)
 
+	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	if !ok {
+		panic("No activity flag set")
+	}
+
 	setLinger(dst)
 
 	var loopTimeout = 1 * time.Second
@@ -234,11 +239,13 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				logger.Info("loop q -> t: %v", src.StreamID())
+				*activityFlag = false
 				continue
 			}
 			logger.Info("finish q -> t: %v", src.StreamID())
 			return
 		}
+		*activityFlag = true
 	}
 }
 
@@ -254,6 +261,11 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		tsk.End()
 		streamWait.Done()
 	}()
+
+	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	if !ok {
+		panic("No activity flag set")
+	}
 
 	setLinger(src)
 
@@ -300,11 +312,13 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				logger.Info("loop t -> q: %v", dst.StreamID())
+				*activityFlag = false
 				continue
 			}
 			logger.Info("finish t -> q: %v", dst.StreamID())
 			return
 		}
+		*activityFlag = true
 	}
 }
 
