@@ -422,7 +422,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 		tsk.End()
 		streamWait.Done()
-		logger.Info("== Stream TCP->Quic done ==", dst.StreamID())
+		logger.Info("== Stream %v TCP->Quic done ==", dst.StreamID())
 	}()
 
 	var activityFlag, ok = ctx.Value(ACTIVITY_RX_FLAG).(*bool)
@@ -472,7 +472,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 
 		tsk.End()
 		streamWait.Done()
-		logger.Info("== Stream Quic->TCP done ==", src.StreamID())
+		logger.Info("== Stream %v Quic->TCP done ==", src.StreamID())
 	}()
 
 	var activityFlag, ok = ctx.Value(ACTIVITY_TX_FLAG).(*bool)

@@ -247,7 +247,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				logger.Info("loop q -> t: %v", src.StreamID())
 				*activityFlag = false
 				continue
 			}
