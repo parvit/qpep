@@ -210,7 +210,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		} else {
 			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
-			logger.Debug("q -> t: %d", written)
+			//logger.Debug("q -> t: %d", written)
 		}
 		tsk.End()
 
@@ -220,10 +220,10 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
+				logger.Info("loop q -> t: %v", src.StreamID())
 				continue
 			}
-			//log.Printf("Error on Copy %s\n", err)
-			//logger.Debug("finish q -> t")
+			logger.Info("finish q -> t: %v", src.StreamID())
 			return
 		}
 	}
@@ -286,9 +286,10 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && (nErr.Timeout() || nErr.Temporary()) {
+				logger.Info("loop t -> q: %v", dst.StreamID())
 				continue
 			}
-			//logger.Debug("finish t -> q")
+			logger.Info("finish t -> q: %v", dst.StreamID())
 			return
 		}
 	}

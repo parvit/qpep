@@ -87,7 +87,9 @@ func handleTCPConn(tcpConn net.Conn) {
 		logger.OnError(errProxy, "opening proxy connection")
 	}
 
-	var quicStream, err = getQuicStream()
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var quicStream, err = getQuicStream(ctx)
 	if err != nil {
 		tcpConn.Close()
 		return
@@ -133,8 +135,6 @@ func handleTCPConn(tcpConn net.Conn) {
 		}
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-
 	//Proxy all stream content from quic to TCP and from TCP to quic
 	logger.Info("== Stream %d Start ==", quicStream.StreamID())
 	var activityFlag = false
@@ -145,7 +145,9 @@ func handleTCPConn(tcpConn net.Conn) {
 	go connectionActivityTimer(&activityFlag, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying
+	logger.Info("== Stream %d Wait ==", quicStream.StreamID())
 	streamWait.Wait()
+	logger.Info("== Stream %d WaitEnd ==", quicStream.StreamID())
 
 	quicStream.CancelWrite(0)
 	quicStream.CancelRead(0)
@@ -172,7 +174,7 @@ func connectionActivityTimer(flag *bool, cancelFunc context.CancelFunc) {
 
 // getQuicStream method handles the opening or reutilization of the quic session, and launches a new
 // quic stream for communication
-func getQuicStream() (quic.Stream, error) {
+func getQuicStream(ctx context.Context) (quic.Stream, error) {
 	var err error
 	var quicStream quic.Stream = nil
 
@@ -197,7 +199,7 @@ func getQuicStream() (quic.Stream, error) {
 	}
 
 	//Open a stream to send writtenData on this new session
-	quicStream, err = quicSession.OpenStreamSync(context.Background())
+	quicStream, err = quicSession.OpenStreamSync(ctx)
 	// if we cannot open a stream on this session, send a TCP RST and let the client decide to try again
 	logger.OnError(err, "Unable to open QUIC stream")
 	if err != nil {
@@ -409,6 +411,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 		tsk.End()
 		streamWait.Done()
+		logger.Info("== Stream TCP->Quic done ==", dst.StreamID())
 	}()
 
 	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
@@ -458,6 +461,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 
 		tsk.End()
 		streamWait.Done()
+		logger.Info("== Stream Quic->TCP done ==", src.StreamID())
 	}()
 
 	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
@@ -497,7 +501,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		}
 		*activityFlag = true
 	}
-	//logger.Info("Finished Copying Stream ID %d, TCP Conn %s->%s\n", srcConn.StreamID(), dst.LocalAddr().String(), dst.RemoteAddr().String())
 }
 
 func setLinger(c net.Conn) {

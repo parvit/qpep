@@ -105,7 +105,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					logger.Info("#%d bytes to read: %d", id, toRead)
-					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
+					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 					totalBytesInTimeDelta = 0
 				}
 			}

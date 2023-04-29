@@ -83,7 +83,7 @@ func main() {
 		}
 		traces[tag] = append(traces[tag], plotter.XY{
 			X: float64(timestamp.UnixMilli()),
-			Y: speedValue / 1000.0,
+			Y: speedValue,
 		})
 	}
 
