@@ -77,7 +77,7 @@ func CloseLogger() {
 // Outputs the same data to the OutputDebugString facility if os is Windows and level is set to Debug
 func Info(format string, values ...interface{}) {
 	_log.Info().Msgf(format, values...)
-	stdlog.Printf(format, values...)
+	//stdlog.Printf(format, values...)
 	if runtime.GOOS == "windows" && _log.GetLevel() >= log.DebugLevel {
 		_, _ = dbg.Printf(format, values...)
 		return
@@ -91,7 +91,7 @@ func Debug(format string, values ...interface{}) {
 		return
 	}
 	_log.Debug().Msgf(format, values...)
-	stdlog.Printf(format, values...)
+	//stdlog.Printf(format, values...)
 	if runtime.GOOS == "windows" && _log.GetLevel() >= log.DebugLevel {
 		_, _ = dbg.Printf(format, values...)
 		return
