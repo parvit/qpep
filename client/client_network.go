@@ -138,7 +138,7 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	//Proxy all stream content from quic to TCP and from TCP to quic
 	logger.Info("== Stream %d Start ==", quicStream.StreamID())
-	var activityRX, activityTX = false, false
+	var activityRX, activityTX = true, true
 	ctx = context.WithValue(ctx, ACTIVITY_RX_FLAG, &activityRX)
 	ctx = context.WithValue(ctx, ACTIVITY_TX_FLAG, &activityTX)
 	defer func() {

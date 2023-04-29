@@ -81,7 +81,7 @@ func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFu
 		return
 	}
 	<-time.After(ServerConfiguration.IdleTimeout)
-	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
+	logger.Info("activity state: %v / %v", *flag_rx, *flag_tx)
 	if !*flag_rx && !*flag_tx {
 		cancelFunc()
 		return
@@ -159,7 +159,7 @@ func handleQuicStream(quicStream quic.Stream) {
 	var streamWait sync.WaitGroup
 	streamWait.Add(2)
 
-	var activityRX, activityTX = false, false
+	var activityRX, activityTX = true, true
 	ctx = context.WithValue(ctx, ACTIVITY_RX_FLAG, &activityRX)
 	ctx = context.WithValue(ctx, ACTIVITY_TX_FLAG, &activityTX)
 	defer func() {
