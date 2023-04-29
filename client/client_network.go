@@ -28,7 +28,8 @@ import (
 const (
 	BUFFER_SIZE = 512 * 1024
 
-	ACTIVITY_FLAG = "activity"
+	ACTIVITY_RX_FLAG = "activity_rx"
+	ACTIVITY_TX_FLAG = "activity_tx"
 
 	LOCAL_RECONNECTION_RETRIES = 10
 )
@@ -137,12 +138,13 @@ func handleTCPConn(tcpConn net.Conn) {
 
 	//Proxy all stream content from quic to TCP and from TCP to quic
 	logger.Info("== Stream %d Start ==", quicStream.StreamID())
-	var activityFlag = false
-	ctx = context.WithValue(ctx, ACTIVITY_FLAG, &activityFlag)
+	var activityRX, activityTX = false, false
+	ctx = context.WithValue(ctx, ACTIVITY_RX_FLAG, &activityRX)
+	ctx = context.WithValue(ctx, ACTIVITY_TX_FLAG, &activityTX)
 
 	go handleTcpToQuic(ctx, &streamWait, quicStream, tcpConn)
 	go handleQuicToTcp(ctx, &streamWait, tcpConn, quicStream)
-	go connectionActivityTimer(&activityFlag, cancel)
+	go connectionActivityTimer(&activityRX, &activityTX, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying
 	logger.Info("== Stream %d Wait ==", quicStream.StreamID())
@@ -163,14 +165,14 @@ func handleTCPConn(tcpConn net.Conn) {
 	}
 }
 
-func connectionActivityTimer(flag *bool, cancelFunc context.CancelFunc) {
-	<-time.After(1 * time.Second)
-	logger.Info("activity state: %v", *flag)
-	if !*flag {
+func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
+	<-time.After(shared.GetScaledTimeout(1, time.Second))
+	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
+	if !*flag_rx && !*flag_tx {
 		cancelFunc()
 		return
 	}
-	go connectionActivityTimer(flag, cancelFunc)
+	go connectionActivityTimer(flag_rx, flag_tx, cancelFunc)
 }
 
 // getQuicStream method handles the opening or reutilization of the quic session, and launches a new
@@ -415,7 +417,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		logger.Info("== Stream TCP->Quic done ==", dst.StreamID())
 	}()
 
-	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	var activityFlag, ok = ctx.Value(ACTIVITY_RX_FLAG).(*bool)
 	if !ok {
 		panic("No activity flag set")
 	}
@@ -465,7 +467,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		logger.Info("== Stream Quic->TCP done ==", src.StreamID())
 	}()
 
-	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	var activityFlag, ok = ctx.Value(ACTIVITY_TX_FLAG).(*bool)
 	if !ok {
 		panic("No activity flag set")
 	}

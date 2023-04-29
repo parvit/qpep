@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	ACTIVITY_FLAG = "activity"
+	ACTIVITY_RX_FLAG = "activity_rx"
+	ACTIVITY_TX_FLAG = "activity_tx"
 )
 
 // listenQuicSession handles accepting the sessions and the launches goroutines to actually serve them
@@ -143,12 +144,13 @@ func handleQuicStream(quicStream quic.Stream) {
 	var streamWait sync.WaitGroup
 	streamWait.Add(2)
 
-	var activityFlag = false
-	ctx = context.WithValue(ctx, ACTIVITY_FLAG, &activityFlag)
+	var activityRX, activityTX = false, false
+	ctx = context.WithValue(ctx, ACTIVITY_RX_FLAG, &activityRX)
+	ctx = context.WithValue(ctx, ACTIVITY_TX_FLAG, &activityTX)
 
 	go handleQuicToTcp(ctx, &streamWait, srcLimit, tcpConn, quicStream, proxyAddress, trackedAddress)
 	go handleTcpToQuic(ctx, &streamWait, dstLimit, quicStream, tcpConn, trackedAddress)
-	go connectionActivityTimer(&activityFlag, cancel)
+	go connectionActivityTimer(&activityRX, &activityTX, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying or timeout
 	logger.Info("== Stream %d Wait ==", quicStream.StreamID())
@@ -161,14 +163,14 @@ func handleQuicStream(quicStream quic.Stream) {
 	tcpConn.Close()
 }
 
-func connectionActivityTimer(flag *bool, cancelFunc context.CancelFunc) {
-	<-time.After(1 * time.Second)
-	logger.Info("activity state: %v", *flag)
-	if !*flag {
+func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
+	<-time.After(shared.GetScaledTimeout(1, time.Second))
+	logger.Info("activity state: %v / %v", flag_rx, flag_tx)
+	if !*flag_rx && !*flag_tx {
 		cancelFunc()
 		return
 	}
-	go connectionActivityTimer(flag, cancelFunc)
+	go connectionActivityTimer(flag_rx, flag_tx, cancelFunc)
 }
 
 const (
@@ -191,7 +193,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 	api.Statistics.SetMappedAddress(proxyAddress, trackedAddress)
 
-	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	var activityFlag, ok = ctx.Value(ACTIVITY_RX_FLAG).(*bool)
 	if !ok {
 		panic("No activity flag set")
 	}
@@ -263,7 +265,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		streamWait.Done()
 	}()
 
-	var activityFlag, ok = ctx.Value(ACTIVITY_FLAG).(*bool)
+	var activityFlag, ok = ctx.Value(ACTIVITY_TX_FLAG).(*bool)
 	if !ok {
 		panic("No activity flag set")
 	}
