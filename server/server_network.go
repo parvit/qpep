@@ -251,7 +251,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			continue
 		}
 		if err != nil {
-			logger.Error("err q->t: %v", err)
+			//logger.Error("err q->t: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
@@ -328,7 +328,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			continue
 		}
 		if err != nil {
-			logger.Error("err t->q: %v", err)
+			//logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
 				continue
