@@ -164,7 +164,7 @@ func handleQuicStream(quicStream quic.Stream) {
 func connectionActivityTimer(flag *bool, cancelFunc context.CancelFunc) {
 	<-time.After(1 * time.Second)
 	logger.Info("activity state: %v", *flag)
-	if *flag {
+	if !*flag {
 		cancelFunc()
 		return
 	}
