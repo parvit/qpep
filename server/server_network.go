@@ -195,6 +195,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		api.Statistics.DeleteMappedAddress(proxyAddress)
 		tsk.End()
 		streamWait.Done()
+		logger.Info("== Stream %v Quic->TCP done ==", src.StreamID())
 	}()
 
 	api.Statistics.SetMappedAddress(proxyAddress, trackedAddress)
@@ -268,6 +269,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		dst.Close()
 		tsk.End()
 		streamWait.Done()
+		logger.Info("== Stream %v TCP->Quic done ==", dst.StreamID())
 	}()
 
 	var activityFlag, ok = ctx.Value(ACTIVITY_TX_FLAG).(*bool)
@@ -309,7 +311,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		} else {
 			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
-			logger.Debug("t -> q: %d", written)
+			//logger.Debug("t -> q: %d", written)
 		}
 		tsk.End()
 
@@ -319,7 +321,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if err != nil || written == 0 {
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				logger.Info("loop t -> q: %v", dst.StreamID())
+				//logger.Info("loop t -> q: %v", dst.StreamID())
 				*activityFlag = false
 				continue
 			}
