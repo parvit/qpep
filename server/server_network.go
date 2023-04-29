@@ -246,15 +246,23 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 		}
 
-		if err != nil || written == 0 {
-			*activityFlag = false
+		if err != nil {
+			if written > 0 {
+				*activityFlag = true
+				continue
+			}
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+				*activityFlag = false
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
 			return
 		}
-		*activityFlag = true
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
+		return
 	}
 }
 
@@ -319,16 +327,23 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
 		}
 
-		if err != nil || written == 0 {
+		if err != nil {
+			if written > 0 {
+				*activityFlag = true
+				continue
+			}
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				//logger.Info("loop t -> q: %v", dst.StreamID())
 				*activityFlag = false
 				continue
 			}
-			logger.Info("finish t -> q: %v", dst.StreamID())
+			//logger.Info("finish q -> t: %v", src.StreamID())
 			return
 		}
-		*activityFlag = true
+		if written > 0 {
+			*activityFlag = true
+			continue
+		}
+		return
 	}
 }
 
