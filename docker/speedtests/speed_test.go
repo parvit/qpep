@@ -93,7 +93,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			for toRead > 0 {
 				rd := io.LimitReader(resp.Body, 1024)
 				read, err := rd.Read(buff)
-				if err != nil {
+				if err != nil && err != io.EOF {
 					if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 						continue
 					}
@@ -108,7 +108,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)
-				s.T().Logf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
+				//s.T().Logf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					s.T().Logf("#%d bytes to read: %d", id, toRead)
