@@ -88,7 +88,7 @@ jobs:
         shell: powershell
         run: |
           $Stoploop = $false
-          [ int ]$Retrycount = "10"
+          [ int ]$Retrycount = "20"
 
            do {
             try {
@@ -100,10 +100,10 @@ jobs:
             catch {
               $Retrycount = $Retrycount - 1
               if ($Retrycount -gt 0){
-                Start-Sleep -Seconds 10
+                Start-Sleep -Seconds 2
               }
               else {
-                Write-Error "Could not get server after 10 retries." -ErrorAction Stop
+                Write-Error "Could not get server after 20 retries." -ErrorAction Stop
               }
             }
           }
@@ -113,7 +113,10 @@ jobs:
         shell: cmd
         run: |
           cd docker/speedtests/
-          sleep 480
+          go test speed_test.go -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat ^
+             -expect_mb ${{ matrix.download_size }} -connections_num ${{ matrix.connections_number }} ^
+             -test.v -test.timeout 5m
+          go run utils/plotter.go output.csv "Client speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ matrix.download_size }}M][Connections:${{ matrix.connections_number }}]"
 
       - name: Stop Client
         if: always()

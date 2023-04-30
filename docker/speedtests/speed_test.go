@@ -94,7 +94,11 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			for toRead > 0 {
 				rd := io.LimitReader(resp.Body, 1024)
-				read, _ := rd.Read(buff)
+				read, err := rd.Read(buff)
+				assert.Nil(s.T(), err)
+				if err != nil {
+					return
+				}
 				if read == 0 {
 					<-time.After(10 * time.Millisecond)
 					continue
