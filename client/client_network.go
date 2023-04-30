@@ -433,7 +433,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 	setLinger(src)
 
 	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
-	var tempBuffer = make([]byte, BUFFER_SIZE)
 	for {
 		select {
 		case <-ctx.Done():
@@ -448,7 +447,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		_ = dst.SetWriteDeadline(tm)
 
 		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
-		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+		written, err := io.CopyN(dst, src, BUFFER_SIZE)
 		tsk.End()
 
 		if written > 0 {
@@ -487,7 +486,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 	setLinger(dst)
 
 	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
-	var tempBuffer = make([]byte, BUFFER_SIZE)
+	//var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -503,7 +502,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		_ = dst.SetWriteDeadline(tm)
 
 		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
-		written, err := io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+		written, err := io.CopyN(dst, src, BUFFER_SIZE)
 		logger.Debug("q -> t: %d", written)
 		tsk.End()
 

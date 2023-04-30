@@ -208,7 +208,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 	setLinger(dst)
 
 	var loopTimeout = 1 * time.Second
-	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -237,7 +236,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 
 		} else {
-			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+			written, err = io.CopyN(dst, src, BUFFER_SIZE)
 			//logger.Debug("q -> t: %d", written)
 		}
 		tsk.End()
@@ -285,8 +284,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 	var loopTimeout = 1 * time.Second
 
-	var tempBuffer = make([]byte, BUFFER_SIZE)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -314,7 +311,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 
 		} else {
-			written, err = io.CopyBuffer(dst, io.LimitReader(src, BUFFER_SIZE), tempBuffer)
+			written, err = io.CopyN(dst, src, BUFFER_SIZE)
 			//logger.Debug("t -> q: %d", written)
 		}
 		tsk.End()

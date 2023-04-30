@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="client" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="qpep" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="-c -v" />
+    <kind value="PACKAGE" />
+    <package value="github.com/parvit/qpep" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$" />
+    <output_directory value="$PROJECT_DIR$/build" />
+    <method v="2">
+      <option name="GoBeforeRunTask" command="build" />
+    </method>
+  </configuration>
+</component>

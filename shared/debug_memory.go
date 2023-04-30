@@ -4,13 +4,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"time"
 )
 
 func DumpWatcher() {
-	t, _ := os.OpenFile("cpu.prof", os.O_CREATE|os.O_RDWR, 0777)
+	t, err := os.Create("cpu.prof")
+	fmt.Printf("err: %v\n", err)
 	pprof.StartCPUProfile(io.Writer(t))
+	runtime.SetCPUProfileRate(50)
 
 	go func() {
 		defer func() {
@@ -18,11 +21,12 @@ func DumpWatcher() {
 			t.Close()
 		}()
 		for i := 0; i < 20; i++ {
-			t2, _ := os.OpenFile(fmt.Sprintf("heap_%02d.prof", i), os.O_CREATE|os.O_RDWR, 0777)
-			pprof.WriteHeapProfile(t)
+			t2, err2 := os.Create(fmt.Sprintf("heap_%02d.prof", i))
+			fmt.Printf("err2: %v\n", err2)
+			pprof.WriteHeapProfile(t2)
 			t2.Sync()
 			t2.Close()
-			<-time.After(10 * time.Second)
+			<-time.After(3 * time.Second)
 		}
 		pprof.StopCPUProfile()
 	}()

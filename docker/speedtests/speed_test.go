@@ -3,7 +3,6 @@ package speedtests
 import (
 	"flag"
 	"fmt"
-	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -22,9 +21,9 @@ var connections = flag.Int("connections_num", 1, "simultaneous tcp connections t
 var expectedSize = flag.Int("expect_mb", 10, "size in MBs of the target file")
 
 func TestSpeedTestsConfigSuite(t *testing.T) {
-	logger.Info("%v", *targetURL)
-	logger.Info("%v", *connections)
-	logger.Info("%v", *expectedSize)
+	t.Log(*targetURL)
+	t.Log(*connections)
+	t.Log(*expectedSize)
 
 	assert.True(t, *connections > 0)
 	assert.True(t, len(*targetURL) > 0)
@@ -60,20 +59,19 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
 			defer func() {
-				logger.Info("Executor #%d done\n", id)
 				wg.Done()
 			}()
-			logger.Info("Starting executor #%d\n", id)
+			s.T().Logf("Starting executor #%d\n", id)
 
 			client := getClientForAPI(nil)
 			assert.NotNil(s.T(), client)
 			assert.NotNil(s.T(), targetURL)
 
-			logger.Info("GET request #%d", id)
+			s.T().Logf("GET request #%d", id)
 			resp, err := client.Get(*targetURL)
 			assert.Nil(s.T(), err)
 			if err != nil {
-				logger.Info("GET request failed #%d", id)
+				s.T().Logf("GET request failed #%d", id)
 				return
 			}
 			defer resp.Body.Close()
@@ -95,8 +93,12 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			for toRead > 0 {
 				rd := io.LimitReader(resp.Body, 1024)
 				read, err := rd.Read(buff)
-				assert.Nil(s.T(), err)
 				if err != nil {
+					if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+						continue
+					}
+					s.T().Logf("err: %v", err)
+					assert.Failf(s.T(), "failed", "%v", err)
 					return
 				}
 				if read == 0 {
@@ -106,9 +108,10 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)
+				s.T().Logf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
-					logger.Info("#%d bytes to read: %d", id, toRead)
+					s.T().Logf("#%d bytes to read: %d", id, toRead)
 					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 					totalBytesInTimeDelta = 0
 				}
@@ -118,13 +121,15 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
 			}
 
-			logger.Info("#%d GET request done, dumping to CSV...", id)
+			assert.True(s.T(), toRead <= 0)
+
+			s.T().Logf("#%d GET request done, dumping to CSV...", id)
 			lock.Lock()
 			defer lock.Unlock()
 			for _, ev := range events {
 				f.WriteString(ev)
 			}
-			logger.Info("#%d done", id)
+			s.T().Logf("#%d done", id)
 		}(index)
 	}
 
@@ -143,7 +148,6 @@ func getClientForAPI(localAddr net.Addr) *http.Client {
 		Transport: &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
 				shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
-				logger.Info("API Proxy: %v %v\n", shared.UsingProxy, shared.ProxyAddress)
 				if shared.UsingProxy {
 					return shared.ProxyAddress, nil
 				}
