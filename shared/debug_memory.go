@@ -1,21 +1,29 @@
 package shared
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"runtime/pprof"
 	"time"
 )
 
-func DumpMemoryHeapWatcher() {
+func DumpWatcher() {
+	t, _ := os.OpenFile("cpu.prof", os.O_CREATE|os.O_RDWR, 0777)
+	pprof.StartCPUProfile(io.Writer(t))
+
 	go func() {
-		home := os.Getenv("HOME")
-		for {
-			t, _ := os.OpenFile(home+"/dump_"+time.Now().Format(time.RFC3339Nano)+".prof", os.O_RDWR, 0777)
-			pprof.WriteHeapProfile(io.Writer(t))
+		defer func() {
 			t.Sync()
 			t.Close()
+		}()
+		for i := 0; i < 20; i++ {
+			t2, _ := os.OpenFile(fmt.Sprintf("heap_%02d.prof", i), os.O_CREATE|os.O_RDWR, 0777)
+			pprof.WriteHeapProfile(t)
+			t2.Sync()
+			t2.Close()
 			<-time.After(10 * time.Second)
 		}
+		pprof.StopCPUProfile()
 	}()
 }

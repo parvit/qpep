@@ -209,7 +209,7 @@ func (p *QPepService) Main() {
 
 	Info("Main")
 
-	shared.DumpMemoryHeapWatcher()
+	shared.DumpWatcher()
 
 	if err := shared.ReadConfiguration(false); err != nil {
 		panic(err)
