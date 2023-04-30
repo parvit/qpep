@@ -118,7 +118,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			}
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
-				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta))
+				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 			}
 
 			assert.True(s.T(), toRead <= 0)

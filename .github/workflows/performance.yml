@@ -132,12 +132,12 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: data_client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
-          path: "${{ github.workspace }}/**/*.csv"
+          path: "${{ github.workspace }}/docker/speedtests/output.csv"
 
       - uses: actions/upload-artifact@v3
         with:
           name: plots_client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
-          path: "${{ github.workspace }}/**/data.png"
+          path: "${{ github.workspace }}/docker/speedtests/data.png"
 
       - uses: actions/upload-artifact@v3
         with:
@@ -216,13 +216,18 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: data_${{ inputs.connection_delay_ms }}ms
+          name: data_server_${{ inputs.connection_delay_ms }}ms
           path: "${{ github.workspace }}/docker/server-data-env/output/data.csv"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: plot_${{ inputs.connection_delay_ms }}
+          name: plots_server_${{ inputs.connection_delay_ms }}
           path: "${{ github.workspace }}/docker/speedtests/data.png"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: logs_server_${{ inputs.connection_delay_ms }}
+          path: "${{ github.workspace }}/**/*.log"
 
       - name: Cleanup
         if: always()
