@@ -9,18 +9,24 @@ import (
 	"time"
 )
 
-func DumpWatcher() {
+func CPUWatcher() {
 	t, err := os.Create("cpu.prof")
 	fmt.Printf("err: %v\n", err)
+	runtime.SetCPUProfileRate(100)
+
 	pprof.StartCPUProfile(io.Writer(t))
-	runtime.SetCPUProfileRate(50)
 
 	go func() {
-		defer func() {
-			t.Sync()
-			t.Close()
-		}()
-		for i := 0; i < 20; i++ {
+		<-time.After(1 * time.Minute)
+		pprof.StopCPUProfile()
+		t.Sync()
+		t.Close()
+	}()
+}
+
+func MemoryWatcher() {
+	go func() {
+		for i := 0; i < 30; i++ {
 			t2, err2 := os.Create(fmt.Sprintf("heap_%02d.prof", i))
 			fmt.Printf("err2: %v\n", err2)
 			pprof.WriteHeapProfile(t2)
@@ -28,6 +34,5 @@ func DumpWatcher() {
 			t2.Close()
 			<-time.After(3 * time.Second)
 		}
-		pprof.StopCPUProfile()
 	}()
 }

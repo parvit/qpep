@@ -81,6 +81,8 @@ func RunClient(ctx context.Context, cancel context.CancelFunc) {
 	}()
 	logger.Info("Starting TCP-QPEP Tunnel Listener")
 
+	shared.CPUWatcher()
+
 	// update configuration from flags
 	validateConfiguration()
 
