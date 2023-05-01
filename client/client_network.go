@@ -37,6 +37,8 @@ const (
 var (
 	// proxyListener listener for the local http connections that get diverted or proxied to the quic server
 	proxyListener net.Listener
+
+	newSessionLock sync.RWMutex
 	// quicSession listening quic connection to the server
 	quicSession quic.Connection
 )
@@ -188,25 +190,44 @@ func connectionActivityTimer(flag_rx, flag_tx *bool, cancelFunc context.CancelFu
 func getQuicStream(ctx context.Context) (quic.Stream, error) {
 	var err error
 	var quicStream quic.Stream = nil
+	var localSession quic.Connection = nil
+
+	newSessionLock.RLock()
+	localSession = quicSession
+	newSessionLock.RUnlock()
+
+	if localSession == nil {
+		newSessionLock.Lock()
+
+		// open a new quicSession (with all the TLS jazz)
+		localSession, err = openQuicSession()
+		// if we were unable to open a quic session, drop the TCP connection with RST
+		if err != nil {
+			return nil, err
+		}
+
+		quicSession = localSession
+		newSessionLock.Unlock()
+	}
 
 	// if we allow for multiple streams in a session, try and open on the existing session
-	if ClientConfiguration.MultiStream && quicSession != nil {
+	if ClientConfiguration.MultiStream && localSession != nil {
 		logger.Info("Trying to open on existing session")
-		quicStream, err = quicSession.OpenStream()
+		quicStream, err = localSession.OpenStream()
 		if err == nil {
 			logger.Info("Opened a new stream: %d", quicStream.StreamID())
 			return quicStream, nil
 		}
 		// if we weren't able to open a quicStream on that session (usually inactivity timeout), we can try to open a new session
-		logger.OnError(err, "Unable to open new stream on existing QUIC session")
+		logger.OnError(err, "Unable to open new stream on existing QUIC session, closing session")
 		quicStream = nil
-	}
 
-	// open a new quicSession (with all the TLS jazz)
-	quicSession, err = openQuicSession()
-	// if we were unable to open a quic session, drop the TCP connection with RST
-	if err != nil {
-		return nil, err
+		newSessionLock.Lock()
+		quicSession.CloseWithError(quic.ApplicationErrorCode(0), "Stream could not be opened")
+		quicSession = nil
+		newSessionLock.Unlock()
+
+		return nil, quic.ErrServerClosed
 	}
 
 	//Open a stream to send writtenData on this new session
@@ -585,6 +606,6 @@ func openQuicSession() (quic.Connection, error) {
 		return session, nil
 	}
 
-	logger.Error("Unable to Open QUIC Session(Max Retries Exceeded): %v\n", err)
+	logger.Error("Unable to Open QUIC Session: %v\n", err)
 	return nil, shared.ErrFailedGatewayConnect
 }
