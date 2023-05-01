@@ -198,6 +198,7 @@ func getQuicStream(ctx context.Context) (quic.Stream, error) {
 
 	if localSession == nil {
 		newSessionLock.Lock()
+		defer newSessionLock.Unlock()
 
 		// open a new quicSession (with all the TLS jazz)
 		localSession, err = openQuicSession()
@@ -207,7 +208,6 @@ func getQuicStream(ctx context.Context) (quic.Stream, error) {
 		}
 
 		quicSession = localSession
-		newSessionLock.Unlock()
 	}
 
 	// if we allow for multiple streams in a session, try and open on the existing session
