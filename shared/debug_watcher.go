@@ -17,7 +17,7 @@ func CPUWatcher() {
 	pprof.StartCPUProfile(io.Writer(t))
 
 	go func() {
-		<-time.After(1 * time.Minute)
+		<-time.After(3 * time.Minute)
 		pprof.StopCPUProfile()
 		t.Sync()
 		t.Close()
