@@ -3,15 +3,13 @@ package client
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"github.com/parvit/qpep/logger"
-	"io/ioutil"
-	"net/http"
-	"runtime/trace"
-
-	"crypto/tls"
 	"io"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -436,12 +434,9 @@ func handleProxyedRequest(req *http.Request, header *shared.QPepHeader, tcpConn 
 
 // handleTcpToQuic method implements the tcp connection to quic connection side of the connection
 func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.Stream, src net.Conn) {
-	tskKey := fmt.Sprintf("Tcp->Quic:%v", dst.StreamID())
-	_, tsk := trace.NewTask(context.Background(), tskKey)
 	defer func() {
 		_ = recover()
 
-		tsk.End()
 		streamWait.Done()
 		logger.Info("== Stream %v TCP->Quic done ==", dst.StreamID())
 	}()
@@ -467,9 +462,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
 		written, err := io.CopyN(dst, src, BUFFER_SIZE)
-		tsk.End()
 
 		if written > 0 {
 			*activityFlag = true
@@ -489,12 +482,9 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 
 // handleQuicToTcp method implements the quic connection to tcp connection side of the connection
 func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Conn, src quic.Stream) {
-	tskKey := fmt.Sprintf("Quic->Tcp:%v", src.StreamID())
-	_, tsk := trace.NewTask(context.Background(), tskKey)
 	defer func() {
 		_ = recover()
 
-		tsk.End()
 		streamWait.Done()
 		logger.Info("== Stream %v Quic->TCP done ==", src.StreamID())
 	}()
@@ -522,10 +512,8 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		_, tsk := trace.NewTask(context.Background(), "copybuffer."+tskKey)
 		written, err := io.CopyN(dst, src, BUFFER_SIZE)
 		logger.Debug("q -> t: %d", written)
-		tsk.End()
 
 		if written > 0 {
 			*activityFlag = true
