@@ -10,17 +10,23 @@ import (
 )
 
 func CPUWatcher() {
-	t, err := os.Create("cpu.prof")
+	cpuWatcher(0)
+}
+
+func cpuWatcher(idx int) {
+	t, err := os.Create(fmt.Sprintf("cpu_%d.prof", idx))
 	fmt.Printf("err: %v\n", err)
 	runtime.SetCPUProfileRate(100)
 
 	pprof.StartCPUProfile(io.Writer(t))
 
 	go func() {
-		<-time.After(60 * time.Second)
+		<-time.After(10 * time.Second)
 		pprof.StopCPUProfile()
 		t.Sync()
 		t.Close()
+
+		go cpuWatcher(idx + 1)
 	}()
 }
 
