@@ -131,22 +131,22 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
+          name: client_${{ inputs.connection_delay_ms }}ms_${{ matrix.download_size }}MB_${{ matrix.connections_number }}conn
           path: "${{ github.workspace }}/docker/speedtests/output.csv"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
+          name: client_${{ inputs.connection_delay_ms }}ms_${{ matrix.download_size }}MB_${{ matrix.connections_number }}conn
           path: "${{ github.workspace }}/docker/speedtests/speedtests.log"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
+          name: client_${{ inputs.connection_delay_ms }}ms_${{ matrix.download_size }}MB_${{ matrix.connections_number }}conn
           path: "${{ github.workspace }}/docker/speedtests/data.png"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: client_${{ inputs.connection_delay_ms }}_${{ matrix.download_size }}_${{ matrix.connections_number }}
+          name: client_${{ inputs.connection_delay_ms }}ms_${{ matrix.download_size }}MB_${{ matrix.connections_number }}conn
           path: "${{ github.workspace }}/**/*.log"
 
       - name: Auto-cancel workflow on error
@@ -226,12 +226,12 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: server_${{ inputs.connection_delay_ms }}
+          name: server_${{ inputs.connection_delay_ms }}ms
           path: "${{ github.workspace }}/docker/speedtests/data.png"
 
       - uses: actions/upload-artifact@v3
         with:
-          name: server_${{ inputs.connection_delay_ms }}
+          name: server_${{ inputs.connection_delay_ms }}ms
           path: "${{ github.workspace }}/**/*.log"
 
       - name: Cleanup
