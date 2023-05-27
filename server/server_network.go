@@ -191,6 +191,12 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 	setLinger(dst)
 
 	var loopTimeout = 1 * time.Second
+	var tempBuffer []byte
+	if speedLimit > 0 {
+		tempBuffer = make([]byte, speedLimit)
+	} else {
+		tempBuffer = make([]byte, BUFFER_SIZE)
+	}
 
 	for {
 		select {
@@ -208,18 +214,18 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		if speedLimit > 0 {
+		if speedLimit == 0 {
+			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			//logger.Debug("q -> t: %d", written)
+
+		} else {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.CopyN(dst, src, speedLimit)
+			written, err = io.CopyBuffer(dst, src, tempBuffer)
 			var end = limit.Sub(time.Now())
 
 			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
 			time.Sleep(end)
-
-		} else {
-			written, err = io.CopyN(dst, src, BUFFER_SIZE)
-			//logger.Debug("q -> t: %d", written)
 		}
 
 		if written > 0 {
@@ -234,6 +240,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			//logger.Error("err q->t: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
+				<-time.After(1 * time.Millisecond)
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
@@ -261,6 +268,12 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 	setLinger(src)
 
 	var loopTimeout = 1 * time.Second
+	var tempBuffer []byte
+	if speedLimit > 0 {
+		tempBuffer = make([]byte, speedLimit)
+	} else {
+		tempBuffer = make([]byte, BUFFER_SIZE)
+	}
 
 	for {
 		select {
@@ -278,18 +291,18 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		if speedLimit > 0 {
-			var start = time.Now()
-			var limit = start.Add(loopTimeout)
-			written, err = io.CopyN(dst, src, speedLimit)
-			var end = limit.Sub(time.Now())
-
-			//logger.Debug("t -> q: %d / %v", written, end.Nanoseconds())
-			time.Sleep(end)
+		if speedLimit == 0 {
+			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			//logger.Debug("q -> t: %d", written)
 
 		} else {
-			written, err = io.CopyN(dst, src, BUFFER_SIZE)
-			//logger.Debug("t -> q: %d", written)
+			var start = time.Now()
+			var limit = start.Add(loopTimeout)
+			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			var end = limit.Sub(time.Now())
+
+			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
+			time.Sleep(end)
 		}
 
 		if written > 0 {
@@ -304,6 +317,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			//logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
+				<-time.After(1 * time.Millisecond)
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())

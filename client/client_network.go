@@ -449,6 +449,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 	setLinger(src)
 
 	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 	for {
 		select {
 		case <-ctx.Done():
@@ -462,7 +463,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		written, err := io.CopyN(dst, src, BUFFER_SIZE)
+		written, err := io.CopyBuffer(dst, src, tempBuffer)
 
 		if written > 0 {
 			*activityFlag = true
@@ -472,6 +473,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 			//logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
+				<-time.After(1 * time.Millisecond)
 				continue
 			}
 		}
@@ -497,7 +499,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 	setLinger(dst)
 
 	var loopTimeout = shared.GetScaledTimeout(1, time.Second)
-	//var tempBuffer = make([]byte, BUFFER_SIZE)
+	var tempBuffer = make([]byte, BUFFER_SIZE)
 
 	for {
 		select {
@@ -512,7 +514,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		_ = dst.SetReadDeadline(tm)
 		_ = dst.SetWriteDeadline(tm)
 
-		written, err := io.CopyN(dst, src, BUFFER_SIZE)
+		written, err := io.CopyBuffer(dst, src, tempBuffer)
 		logger.Debug("q -> t: %d", written)
 
 		if written > 0 {
@@ -523,6 +525,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 			//logger.Error("err q->t: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 				*activityFlag = false
+				<-time.After(1 * time.Millisecond)
 				continue
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
