@@ -3,6 +3,7 @@ package speedtests
 import (
 	"flag"
 	"fmt"
+	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -30,6 +31,8 @@ func TestSpeedTestsConfigSuite(t *testing.T) {
 	assert.True(t, *expectedSize > 0)
 
 	*expectedSize = 1024 * 1024 * *expectedSize
+
+	logger.SetupLogger("speedtests.log")
 
 	var q SpeedTestsConfigSuite
 	suite.Run(t, &q)
@@ -61,17 +64,17 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			defer func() {
 				wg.Done()
 			}()
-			s.T().Logf("Starting executor #%d\n", id)
+			logger.Info("Starting executor #%d\n", id)
 
 			client := getClientForAPI(nil)
 			assert.NotNil(s.T(), client)
 			assert.NotNil(s.T(), targetURL)
 
-			s.T().Logf("GET request #%d", id)
+			logger.Info("GET request #%d", id)
 			resp, err := client.Get(*targetURL)
 			assert.Nil(s.T(), err)
 			if err != nil {
-				s.T().Logf("GET request failed #%d", id)
+				logger.Info("GET request failed #%d", id)
 				return
 			}
 			defer resp.Body.Close()
@@ -95,23 +98,24 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				read, err := rd.Read(buff)
 				if err != nil && err != io.EOF {
 					if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+						<-time.After(1 * time.Millisecond)
 						continue
 					}
-					s.T().Logf("err: %v", err)
+					logger.Info("err: %v", err)
 					assert.Failf(s.T(), "failed", "%v", err)
 					return
 				}
 				if read == 0 {
-					<-time.After(10 * time.Millisecond)
+					<-time.After(1 * time.Millisecond)
 					continue
 				}
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)
-				//s.T().Logf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
+				//logger.Info("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
-					s.T().Logf("#%d bytes to read: %d", id, toRead)
+					logger.Info("#%d bytes to read: %d", id, toRead)
 					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 					totalBytesInTimeDelta = 0
 				}
@@ -123,13 +127,13 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			assert.True(s.T(), toRead <= 0)
 
-			s.T().Logf("#%d GET request done, dumping to CSV...", id)
+			logger.Info("#%d GET request done, dumping to CSV...", id)
 			lock.Lock()
 			defer lock.Unlock()
 			for _, ev := range events {
 				f.WriteString(ev)
 			}
-			s.T().Logf("#%d done", id)
+			logger.Info("#%d done", id)
 		}(index)
 	}
 

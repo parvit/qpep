@@ -9,13 +9,16 @@ import (
 	"time"
 )
 
-func CPUWatcher() {
+const (
+	DEBUG_FILE_FMT = "%s_%v_20060102150405.prof"
+)
+
+func WatcherCPU() {
 	cpuWatcher(0)
 }
 
 func cpuWatcher(idx int) {
-	t, err := os.Create(fmt.Sprintf("cpu_%d.prof", idx))
-	fmt.Printf("err: %v\n", err)
+	t, _ := os.Create(fmt.Sprintf(DEBUG_FILE_FMT, "cpu", idx, time.Now().Format("20060102150405")))
 	runtime.SetCPUProfileRate(100)
 
 	pprof.StartCPUProfile(io.Writer(t))
@@ -30,15 +33,18 @@ func cpuWatcher(idx int) {
 	}()
 }
 
-func MemoryWatcher() {
+func WatcherHeap() {
+	heapWatcher(0)
+}
+
+func heapWatcher(idx int) {
+	t, _ := os.Create(fmt.Sprintf(DEBUG_FILE_FMT, "heap", idx, time.Now().Format("20060102150405")))
+	pprof.WriteHeapProfile(t)
+	t.Sync()
+	t.Close()
+
 	go func() {
-		for i := 0; i < 30; i++ {
-			t2, err2 := os.Create(fmt.Sprintf("heap_%02d.prof", i))
-			fmt.Printf("err2: %v\n", err2)
-			pprof.WriteHeapProfile(t2)
-			t2.Sync()
-			t2.Close()
-			<-time.After(3 * time.Second)
-		}
+		<-time.After(10 * time.Second)
+		heapWatcher(idx + 1)
 	}()
 }
