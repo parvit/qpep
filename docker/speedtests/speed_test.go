@@ -139,6 +139,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				read, err := rd.Read(buff)
 				if err != nil && err != io.EOF {
 					if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+						flagActivity = false
 						<-time.After(1 * time.Millisecond)
 						continue
 					}
@@ -147,6 +148,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 					return
 				}
 				if read == 0 {
+					flagActivity = false
 					<-time.After(1 * time.Millisecond)
 					continue
 				}
