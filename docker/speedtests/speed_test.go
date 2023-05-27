@@ -91,8 +91,20 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
+			var events = make([]string, 0, 256)
+
 			testlog.Info().Msgf("Starting executor #%d\n", id)
 			defer func() {
+				testlog.Info().Msgf("#%d GET request done, dumping to CSV...", id)
+
+				// dump the captured events to csv
+				lock.Lock()
+				defer lock.Unlock()
+				for _, ev := range events {
+					f.WriteString(ev)
+				}
+				testlog.Info().Msgf("#%d done", id)
+
 				testlog.Info().Msgf("Stopped executor #%d\n", id)
 				wg.Done()
 			}()
@@ -116,8 +128,6 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				return
 			}
 
-			var events = make([]string, 0, 256)
-
 			var eventTag = fmt.Sprintf("conn-%d-speed", id)
 
 			var totalBytesInTimeDelta int64 = 0
@@ -128,10 +138,11 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			ctx, cancel := context.WithCancel(context.Background())
 			go connectivityTimeout(cancel, &flagActivity, 1*time.Second)
 
+		READLOOP:
 			for toRead > 0 {
 				select {
 				case <-ctx.Done():
-					return
+					break READLOOP
 				default:
 				}
 
@@ -166,17 +177,10 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			if totalBytesInTimeDelta > 0 {
 				start = time.Now()
 				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
+				testlog.Info().Msgf("#%d bytes to read: %d", id, toRead)
 			}
 
 			assert.True(s.T(), toRead <= 0)
-
-			testlog.Info().Msgf("#%d GET request done, dumping to CSV...", id)
-			lock.Lock()
-			defer lock.Unlock()
-			for _, ev := range events {
-				f.WriteString(ev)
-			}
-			testlog.Info().Msgf("#%d done", id)
 		}(index)
 	}
 
