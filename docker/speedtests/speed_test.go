@@ -1,10 +1,11 @@
 package speedtests
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
+	log "github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"io"
@@ -21,6 +22,8 @@ var targetURL = flag.String("target_url", "", "url to download")
 var connections = flag.Int("connections_num", 1, "simultaneous tcp connections to make to the server")
 var expectedSize = flag.Int("expect_mb", 10, "size in MBs of the target file")
 
+var testlog log.Logger
+
 func TestSpeedTestsConfigSuite(t *testing.T) {
 	t.Log(*targetURL)
 	t.Log(*connections)
@@ -30,9 +33,17 @@ func TestSpeedTestsConfigSuite(t *testing.T) {
 	assert.True(t, len(*targetURL) > 0)
 	assert.True(t, *expectedSize > 0)
 
-	*expectedSize = 1024 * 1024 * *expectedSize
+	*expectedSize = 1024 * 1024 * (*expectedSize)
 
-	logger.SetupLogger("speedtests.log")
+	_logFile, err := os.OpenFile("./speedtests.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+	assert.NotNil(t, err)
+
+	testlog = log.New(_logFile).Level(log.DebugLevel).
+		With().Timestamp().Logger()
+
+	defer func() {
+		_logFile.Close()
+	}()
 
 	var q SpeedTestsConfigSuite
 	suite.Run(t, &q)
@@ -40,6 +51,25 @@ func TestSpeedTestsConfigSuite(t *testing.T) {
 
 type SpeedTestsConfigSuite struct {
 	suite.Suite
+}
+
+func (s *SpeedTestsConfigSuite) BeforeTest(suiteName, testName string) {
+	testlog.Info().Msgf("Starting test [%s.%s]\n", suiteName, testName)
+}
+func (s *SpeedTestsConfigSuite) AfterTest(suiteName, testName string) {
+	testlog.Info().Msgf("Finished test [%s.%s]\n", suiteName, testName)
+}
+
+func connectivityTimeout(cancel context.CancelFunc, activityFlag *bool, timeout time.Duration) {
+	if activityFlag == nil {
+		return
+	}
+	<-time.After(timeout)
+	if *activityFlag {
+		go connectivityTimeout(cancel, activityFlag, timeout)
+		return
+	}
+	cancel()
 }
 
 func (s *SpeedTestsConfigSuite) TestRun() {
@@ -61,20 +91,21 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
+			testlog.Info().Msgf("Starting executor #%d\n", id)
 			defer func() {
+				testlog.Info().Msgf("Stopped executor #%d\n", id)
 				wg.Done()
 			}()
-			logger.Info("Starting executor #%d\n", id)
 
 			client := getClientForAPI(nil)
 			assert.NotNil(s.T(), client)
 			assert.NotNil(s.T(), targetURL)
 
-			logger.Info("GET request #%d", id)
+			testlog.Info().Msgf("GET request #%d", id)
 			resp, err := client.Get(*targetURL)
 			assert.Nil(s.T(), err)
 			if err != nil {
-				logger.Info("GET request failed #%d", id)
+				testlog.Info().Msgf("GET request failed #%d", id)
 				return
 			}
 			defer resp.Body.Close()
@@ -93,7 +124,17 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			var start = time.Now()
 			var buff = make([]byte, 1024)
 
+			var flagActivity = true
+			ctx, cancel := context.WithCancel(context.Background())
+			go connectivityTimeout(cancel, &flagActivity, 1*time.Second)
+
 			for toRead > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
 				rd := io.LimitReader(resp.Body, 1024)
 				read, err := rd.Read(buff)
 				if err != nil && err != io.EOF {
@@ -101,7 +142,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 						<-time.After(1 * time.Millisecond)
 						continue
 					}
-					logger.Info("err: %v", err)
+					testlog.Info().Msgf("err: %v", err)
 					assert.Failf(s.T(), "failed", "%v", err)
 					return
 				}
@@ -112,10 +153,10 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)
-				//logger.Info("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
+				//testlog.Info().Msgf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
-					logger.Info("#%d bytes to read: %d", id, toRead)
+					testlog.Info().Msgf("#%d bytes to read: %d", id, toRead)
 					events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 					totalBytesInTimeDelta = 0
 				}
@@ -127,13 +168,13 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			assert.True(s.T(), toRead <= 0)
 
-			logger.Info("#%d GET request done, dumping to CSV...", id)
+			testlog.Info().Msgf("#%d GET request done, dumping to CSV...", id)
 			lock.Lock()
 			defer lock.Unlock()
 			for _, ev := range events {
 				f.WriteString(ev)
 			}
-			logger.Info("#%d done", id)
+			testlog.Info().Msgf("#%d done", id)
 		}(index)
 	}
 
@@ -148,7 +189,7 @@ func getClientForAPI(localAddr net.Addr) *http.Client {
 		DualStack: true,
 	}
 	return &http.Client{
-		Timeout: 120 * time.Second,
+		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
 				shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
