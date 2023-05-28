@@ -125,14 +125,14 @@ jobs:
         shell: cmd
         run: |
           cd docker/speedtests/
-          go test speed_test.go -v -c -o speed_tests.test
+          go test speed_test.go -v -c -o speedtests.test
 
           ./speedtests.test -target_url http://${{ inputs.server_public_address }}:8080/target_${{ matrix.download_size }}M.dat ^
              -expect_mb ${{ matrix.download_size }} -connections_num ${{ matrix.connections_number }} ^
-             -test.v -test.timeout 5m > speed_tests.out 2>&1
+             -test.v -test.timeout 5m > speedtests.out 2>&1
 
           echo "=== Speed Test Results ===" >> $GITHUB_STEP_SUMMARY
-          type speed_tests.out >> $GITHUB_STEP_SUMMARY
+          type speedtests.out >> $GITHUB_STEP_SUMMARY
           
           go run utils/plotter.go output.csv "Client speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ matrix.download_size }}M][Connections:${{ matrix.connections_number }}]"
 
@@ -146,13 +146,6 @@ jobs:
         if: always()
         run: |
           go run docker/speedtests/utils/reset_proxy_util.go
-
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
-        with:
-          check_name: "Performance Tests - ${{ inputs.connection_delay_ms }}ms/${{ matrix.download_size }}MB/${{ matrix.connections_number }}conn"
-          junit_files: "speed_tests.xml"
 
       - uses: actions/upload-artifact@v3
         with:
