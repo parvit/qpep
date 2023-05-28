@@ -3,6 +3,11 @@ name: PerformanceTests
 on:
   workflow_dispatch:
     inputs:
+      server_wait_timeout:
+        description: 'connection delay in milliseconds set on the server'
+        type: integer
+        default: 300
+        required: true
       connection_delay_ms:
         description: 'connection delay in milliseconds set on the server'
         type: integer
@@ -197,16 +202,17 @@ jobs:
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
 
       - name: Wait Tests
+        timeout-minutes: 60 # max allowed timeouts
         run: |
-          sleep 80
+          echo [Starting wait for tests execution...]
+          sleep ${{ inputs.server_wait_timeout }}          
+          echo [Wait done]
 
       - name: Stop Server Container
         if: always()
         run: |
           cd docker/server-env/
           docker compose down -v
-          cd output/
-          dir
 
       - name: Stop Data Server Container
         if: always()
