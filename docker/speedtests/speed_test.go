@@ -166,7 +166,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 				totalBytesInTimeDelta += int64(read)
 				toRead -= int64(read)
-				//testlog.Info().Msgf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
+				testlog.Info().Msgf("#%d read: %d, toRead: %d", id, totalBytesInTimeDelta, toRead)
 				if time.Since(start) > 1*time.Second {
 					start = time.Now()
 					testlog.Info().Msgf("#%d bytes to read: %d", id, toRead)
