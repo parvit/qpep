@@ -36,7 +36,7 @@ func TestSpeedTestsConfigSuite(t *testing.T) {
 	*expectedSize = 1024 * 1024 * (*expectedSize)
 
 	_logFile, err := os.OpenFile("./speedtests.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
-	assert.NotNil(t, err)
+	assert.Nil(t, err)
 
 	testlog = log.New(_logFile).Level(log.DebugLevel).
 		With().Timestamp().Logger()
@@ -60,13 +60,13 @@ func (s *SpeedTestsConfigSuite) AfterTest(suiteName, testName string) {
 	testlog.Info().Msgf("Finished test [%s.%s]\n", suiteName, testName)
 }
 
-func connectivityTimeout(cancel context.CancelFunc, activityFlag *bool, timeout time.Duration) {
+func idlingTimeout(cancel context.CancelFunc, activityFlag *bool, timeout time.Duration) {
 	if activityFlag == nil {
 		return
 	}
 	<-time.After(timeout)
 	if *activityFlag {
-		go connectivityTimeout(cancel, activityFlag, timeout)
+		go idlingTimeout(cancel, activityFlag, timeout)
 		return
 	}
 	cancel()
@@ -127,6 +127,9 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				assert.Fail(s.T(), "No response / wrong response")
 				return
 			}
+			defer func() {
+				assert.True(s.T(), toRead <= 0, "Download was incomplete")
+			}()
 
 			var eventTag = fmt.Sprintf("conn-%d-speed", id)
 
@@ -136,7 +139,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			var flagActivity = true
 			ctx, cancel := context.WithCancel(context.Background())
-			go connectivityTimeout(cancel, &flagActivity, idleTimeout)
+			go idlingTimeout(cancel, &flagActivity, idleTimeout)
 
 		READLOOP:
 			for toRead > 0 {
@@ -179,8 +182,6 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 				testlog.Info().Msgf("#%d bytes to read: %d", id, toRead)
 			}
-
-			assert.True(s.T(), toRead <= 0)
 		}(index)
 	}
 
