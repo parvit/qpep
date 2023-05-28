@@ -1,10 +1,13 @@
 name: PerformanceTests
 
 on:
+  schedule:
+    - cron: '1 1 * * *'
+
   workflow_dispatch:
     inputs:
       server_wait_timeout:
-        description: 'connection delay in milliseconds set on the server'
+        description: 'Server global timeout for tests'
         type: integer
         default: 300
         required: true
@@ -39,7 +42,7 @@ on:
         default: false
         required: true
 
-run-name: Performance Testing - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
+run-name: Performance Testing [${{ github.event_name }}] - ${{ inputs.server_public_address }}/${{ inputs.connection_delay_ms }}ms delay
 
 jobs:
   run-client:
@@ -128,7 +131,8 @@ jobs:
              -expect_mb ${{ matrix.download_size }} -connections_num ${{ matrix.connections_number }} ^
              -test.v -test.timeout 5m &> speed_tests.out || true
 
-          cat speed_tests.out | go-junit-report > ../speed_tests.xml
+          echo "=== Speed Test Results ===" >> $GITHUB_STEP_SUMMARY
+          cat speed_tests.out >> $GITHUB_STEP_SUMMARY
           
           go run utils/plotter.go output.csv "Client speed test [Delay:${{ inputs.connection_delay_ms }}ms][TargetSize:${{ matrix.download_size }}M][Connections:${{ matrix.connections_number }}]"
 
@@ -168,7 +172,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: client_${{ inputs.connection_delay_ms }}ms_${{ matrix.download_size }}MB_${{ matrix.connections_number }}conn
-          path: "${{ github.workspace }}/**/*.log"
+          path: "${{ github.workspace }}/build/*.log"
 
       - name: Auto-cancel workflow on error
         if: failure()
@@ -254,7 +258,7 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: server_${{ inputs.connection_delay_ms }}ms
-          path: "${{ github.workspace }}/**/*.log"
+          path: "${{ github.workspace }}/build/*.log"
 
       - name: Cleanup
         if: always()

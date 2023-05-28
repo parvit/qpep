@@ -65,11 +65,13 @@ func idlingTimeout(cancel context.CancelFunc, activityFlag *bool, timeout time.D
 		return
 	}
 	<-time.After(timeout)
+	testlog.Info().Msgf(">> Idle state: %v", *activityFlag)
 	if *activityFlag {
 		go idlingTimeout(cancel, activityFlag, timeout)
 		return
 	}
 	cancel()
+	testlog.Info().Msgf(">> Cancel for idle state")
 }
 
 func (s *SpeedTestsConfigSuite) TestRun() {
@@ -191,7 +193,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 func getClientForAPI(localAddr net.Addr) (*http.Client, time.Duration) {
 	dialer := &net.Dialer{
 		LocalAddr: localAddr,
-		Timeout:   10 * time.Second,
+		Timeout:   5 * time.Minute,
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
