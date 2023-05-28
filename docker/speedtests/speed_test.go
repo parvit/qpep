@@ -109,7 +109,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				wg.Done()
 			}()
 
-			client := getClientForAPI(nil)
+			client, idleTimeout := getClientForAPI(nil)
 			assert.NotNil(s.T(), client)
 			assert.NotNil(s.T(), targetURL)
 
@@ -136,7 +136,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			var flagActivity = true
 			ctx, cancel := context.WithCancel(context.Background())
-			go connectivityTimeout(cancel, &flagActivity, 1*time.Second)
+			go connectivityTimeout(cancel, &flagActivity, idleTimeout)
 
 		READLOOP:
 			for toRead > 0 {
@@ -187,7 +187,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	wg.Wait()
 }
 
-func getClientForAPI(localAddr net.Addr) *http.Client {
+func getClientForAPI(localAddr net.Addr) (*http.Client, time.Duration) {
 	dialer := &net.Dialer{
 		LocalAddr: localAddr,
 		Timeout:   10 * time.Second,
@@ -195,7 +195,7 @@ func getClientForAPI(localAddr net.Addr) *http.Client {
 		DualStack: true,
 	}
 	return &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
 				shared.UsingProxy, shared.ProxyAddress = shared.GetSystemProxyEnabled()
@@ -206,9 +206,9 @@ func getClientForAPI(localAddr net.Addr) *http.Client {
 			},
 			DialContext:     dialer.DialContext,
 			MaxIdleConns:    0,
-			IdleConnTimeout: 10 * time.Second,
+			IdleConnTimeout: 3 * time.Second,
 			//TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
-	}
+	}, 10 * time.Second
 }
