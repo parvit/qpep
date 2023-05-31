@@ -9,7 +9,7 @@ on:
       server_wait_timeout:
         description: 'Server global timeout for tests'
         type: integer
-        default: 300
+        default: 600
         required: true
       connection_delay_ms:
         description: 'connection delay in milliseconds set on the server'
@@ -54,8 +54,6 @@ jobs:
       matrix:
         download_size: [ 10, 100 ]
         connections_number: [ 1, 4 ]
-#        download_size: [ 1, 10, 100 ]
-#        connections_number: [ 1, 4, 8, 16 ]
     steps:
       - uses: actions/checkout@v3
         with:
