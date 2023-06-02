@@ -65,7 +65,7 @@ func idlingTimeout(body io.ReadCloser, cancel context.CancelFunc, activityFlag, 
 		return
 	}
 	<-time.After(timeout)
-	testlog.Info().Msgf(">> Idle state: %v", *activityFlag)
+	testlog.Info().Msgf(">> Idle state check, last activity: %v", time.Unix(*activityFlag, 0))
 	if time.Now().Unix()-*activityFlag < int64(timeout.Truncate(time.Second).Seconds()) {
 		go idlingTimeout(body, cancel, activityFlag, toRead, timeout)
 		return
@@ -131,11 +131,11 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 
 			toRead := resp.ContentLength
 			if toRead != int64(*expectedSize) {
-				assert.Fail(s.T(), "No response / wrong response")
+				assert.Failf(s.T(), "No response / wrong response", "%d != %d", toRead, int64(*expectedSize))
 				return
 			}
 			defer func() {
-				assert.True(s.T(), toRead <= 0, "Download was incomplete")
+				assert.Equalf(s.T(), 0, toRead, "Download was incomplete, remaining: %d", toRead)
 			}()
 
 			var eventTag = fmt.Sprintf("conn-%d-speed", id)

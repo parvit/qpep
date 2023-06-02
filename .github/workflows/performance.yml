@@ -202,6 +202,7 @@ jobs:
       - name: Wait Tests
         timeout-minutes: 60 # max allowed timeouts
         run: |
+          # CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/status/<ip> | jq .connection_counter)
           echo [Starting wait for tests execution...]
           sleep ${{ inputs.server_wait_timeout }}          
           echo [Wait done]
