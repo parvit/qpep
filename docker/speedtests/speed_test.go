@@ -60,18 +60,20 @@ func (s *SpeedTestsConfigSuite) AfterTest(suiteName, testName string) {
 	testlog.Info().Msgf("Finished test [%s.%s]\n", suiteName, testName)
 }
 
-func idlingTimeout(cancel context.CancelFunc, activityFlag *bool, timeout time.Duration) {
-	if activityFlag == nil {
+func idlingTimeout(cancel context.CancelFunc, activityFlag *bool, toRead *int64, timeout time.Duration) {
+	if activityFlag == nil || toRead == nil {
 		return
 	}
 	<-time.After(timeout)
 	testlog.Info().Msgf(">> Idle state: %v", *activityFlag)
 	if *activityFlag {
-		go idlingTimeout(cancel, activityFlag, timeout)
+		go idlingTimeout(cancel, activityFlag, toRead, timeout)
 		return
 	}
-	cancel()
-	testlog.Info().Msgf(">> Cancel for idle state")
+	if *toRead > 0 {
+		cancel()
+		testlog.Info().Msgf(">> Cancel for idle state")
+	}
 }
 
 func (s *SpeedTestsConfigSuite) TestRun() {
@@ -94,10 +96,13 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 	for index := 0; index < *connections; index++ {
 		go func(id int) {
 			var events = make([]string, 0, 256)
+			var flagActivity = true
 
 			testlog.Info().Msgf("Starting executor #%d\n", id)
 			defer func() {
 				testlog.Info().Msgf("#%d GET request done, dumping to CSV...", id)
+
+				flagActivity = false
 
 				// dump the captured events to csv
 				lock.Lock()
@@ -139,9 +144,8 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 			var start = time.Now()
 			var buff = make([]byte, 1024)
 
-			var flagActivity = true
 			ctx, cancel := context.WithCancel(context.Background())
-			go idlingTimeout(cancel, &flagActivity, idleTimeout)
+			go idlingTimeout(cancel, &flagActivity, &toRead, idleTimeout)
 
 		READLOOP:
 			for toRead > 0 {
@@ -184,6 +188,7 @@ func (s *SpeedTestsConfigSuite) TestRun() {
 				events = append(events, fmt.Sprintf("%s,%s,%d\n", start.Format(time.RFC3339Nano), eventTag, totalBytesInTimeDelta/1024))
 				testlog.Info().Msgf("#%d bytes to read: %d", id, toRead)
 			}
+			flagActivity = false
 		}(index)
 	}
 
