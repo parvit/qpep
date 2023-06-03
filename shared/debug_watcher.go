@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	DEBUG_FILE_FMT = "%s_%v_20060102150405.prof"
+	DEBUG_FILE_FMT = "%s_%v_%s.prof"
 )
 
 func WatcherCPU() {
