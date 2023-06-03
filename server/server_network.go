@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	BUFFER_SIZE = 512 * 1024
+	BUFFER_SIZE = 10 * 1024 * 1024
 
 	ACTIVITY_RX_FLAG = "activity_rx"
 	ACTIVITY_TX_FLAG = "activity_tx"
@@ -215,13 +215,13 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetWriteDeadline(tm)
 
 		if speedLimit == 0 {
-			written, err = io.Copy(dst, src)
+			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
 			//logger.Debug("q -> t: %d", written)
 
 		} else {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
 			var end = limit.Sub(time.Now())
 
 			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
@@ -296,11 +296,12 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetWriteDeadline(tm)
 
 		if speedLimit == 0 {
-			written, err = io.Copy(dst, src)
+			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
+
 		} else {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
-			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
 			var end = limit.Sub(time.Now())
 
 			time.Sleep(end)
