@@ -305,21 +305,22 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 		}
 
-		logger.Info("[%v] written: %d", dst.StreamID(), written)
+		//logger.Info("[%v] written: %d", dst.StreamID(), written)
 		if written > 0 {
 			*activityFlag = true
 			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
 			continue
 		}
-		if err == nil {
-			return
+		if err != nil {
+			logger.Error("err t->q: %v", err)
+			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+				logger.Info("[%v] error: %v", dst.StreamID(), nErr)
+				*activityFlag = false
+				<-time.After(1 * time.Millisecond)
+				continue
+			}
 		}
-		//logger.Error("err t->q: %v", err)
-		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-			logger.Info("[%v] error: %v", dst.StreamID(), nErr)
-			*activityFlag = false
-			<-time.After(1 * time.Millisecond)
-		}
+		return
 		//logger.Info("finish q -> t: %v", src.StreamID())
 	}
 }
