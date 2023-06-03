@@ -245,6 +245,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			}
 			//logger.Info("finish q -> t: %v", src.StreamID())
 		}
+		*activityFlag = false
 		return
 	}
 }
@@ -320,16 +321,16 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			continue
 		}
 		if err != nil {
-			// logger.Error("err t->q: %v", err)
+			if src.RemoteAddr().String() == "127.0.0.1:8080" {
+				logger.Info("[%v] error: %v", dst.StreamID(), err)
+			}
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				if src.RemoteAddr().String() == "127.0.0.1:8080" {
-					logger.Info("[%v] error: %v", dst.StreamID(), nErr)
-				}
 				*activityFlag = false
 				<-time.After(1 * time.Millisecond)
 				continue
 			}
 		}
+		*activityFlag = false
 		logger.Info("[%v] finish q -> t: %v", dst.StreamID(), src.RemoteAddr().String())
 		return
 	}
