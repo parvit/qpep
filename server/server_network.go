@@ -294,7 +294,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if speedLimit == 0 {
 			written, err = io.CopyBuffer(dst, src, tempBuffer)
-			if src.RemoteAddr().String() == "172.31.38.198:8080" {
+			if src.RemoteAddr().String() == "127.0.0.1:8080" {
 				logger.Info("q -> t: %d", written)
 			}
 
@@ -304,7 +304,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			written, err = io.CopyBuffer(dst, src, tempBuffer)
 			var end = limit.Sub(time.Now())
 
-			if src.RemoteAddr().String() == "172.31.38.198:8080" {
+			if src.RemoteAddr().String() == "127.0.0.1:8080" {
 				logger.Info("[%v] q -> t: %d / %v", dst.StreamID(), written, end.Nanoseconds())
 			}
 			time.Sleep(end)
@@ -312,7 +312,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		//logger.Info("[%v] written: %d", dst.StreamID(), written)
 		if written > 0 {
-			if src.RemoteAddr().String() == "172.31.38.198:8080" {
+			if src.RemoteAddr().String() == "127.0.0.1:8080" {
 				logger.Info("[%v] q -> t: %d", dst.StreamID(), written)
 			}
 			*activityFlag = true
@@ -322,7 +322,7 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		if err != nil {
 			// logger.Error("err t->q: %v", err)
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				if src.RemoteAddr().String() == "172.31.38.198:8080" {
+				if src.RemoteAddr().String() == "127.0.0.1:8080" {
 					logger.Info("[%v] error: %v", dst.StreamID(), nErr)
 				}
 				*activityFlag = false
