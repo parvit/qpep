@@ -70,8 +70,8 @@ func connectionActivityTimer(conn_id interface{}, flag_rx, flag_tx *bool, cancel
 		return
 	}
 	<-time.After(ServerConfiguration.IdleTimeout)
-	logger.Info("[%v] activity state: %v / %v", conn_id, *flag_rx, *flag_tx)
 	if !*flag_rx && !*flag_tx {
+		logger.Info("[%v] connection canceled for inactivity", conn_id)
 		cancelFunc()
 		return
 	}
@@ -163,8 +163,6 @@ func handleQuicStream(quicStream quic.Stream) {
 	streamWait.Wait()
 	logger.Info("== Stream %d WaitEnd ==", quicStream.StreamID())
 
-	//quicStream.CancelRead(0)
-	//quicStream.CancelWrite(0)
 	quicStream.Close()
 	tcpConn.Close()
 }
@@ -216,7 +214,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		if speedLimit == 0 {
 			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
-			//logger.Debug("q -> t: %d", written)
 
 		} else {
 			var start = time.Now()
@@ -224,14 +221,9 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
 			var end = limit.Sub(time.Now())
 
-			//logger.Debug("q -> t: %d / %v", written, end.Nanoseconds())
 			time.Sleep(end)
 		}
 
-		if dst.RemoteAddr().String() == "127.0.0.1:8080" {
-			logger.Info("[%v] t -> q: %d", src.StreamID(), written)
-			logger.Info("[%v] error: %v", src.StreamID(), err)
-		}
 		if written > 0 {
 			*activityFlag = true
 			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
@@ -247,7 +239,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			<-time.After(1 * time.Millisecond)
 			continue
 		}
-		logger.Info("[%v] finish t -> q: %v", src.StreamID(), dst.RemoteAddr().String())
 		return
 	}
 }
@@ -278,7 +269,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		tempBuffer = make([]byte, BUFFER_SIZE)
 	}
 
-	logger.Info("[%v] start %v", dst.StreamID(), src.RemoteAddr().String())
 	for {
 		select {
 		case <-ctx.Done():
@@ -307,10 +297,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 		}
 
-		if src.RemoteAddr().String() == "127.0.0.1:8080" {
-			logger.Info("[%v] q -> t: %d", dst.StreamID(), written)
-			logger.Info("[%v] error: %v", dst.StreamID(), err)
-		}
 		if written > 0 {
 			*activityFlag = true
 			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
@@ -326,7 +312,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			<-time.After(1 * time.Millisecond)
 			continue
 		}
-		logger.Info("[%v] finish q -> t: %v", dst.StreamID(), src.RemoteAddr().String())
 		return
 	}
 }
