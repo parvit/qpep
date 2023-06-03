@@ -215,7 +215,7 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetWriteDeadline(tm)
 
 		if speedLimit == 0 {
-			written, err = io.CopyBuffer(dst, src, tempBuffer)
+			written, err = io.Copy(dst, src)
 			//logger.Debug("q -> t: %d", written)
 
 		} else {
@@ -228,24 +228,26 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 			time.Sleep(end)
 		}
 
-		if written > 0 {
-			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
+		if dst.RemoteAddr().String() == "127.0.0.1:8080" {
+			logger.Info("[%v] t -> q: %d", src.StreamID(), written)
+			logger.Info("[%v] error: %v", src.StreamID(), err)
 		}
-
 		if written > 0 {
 			*activityFlag = true
+			api.Statistics.IncrementCounter(float64(written), api.PERF_UP_COUNT, trackedAddress)
 			continue
 		}
-		if err != nil {
-			//logger.Error("err q->t: %v", err)
-			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				*activityFlag = false
-				<-time.After(1 * time.Millisecond)
-				continue
-			}
-			//logger.Info("finish q -> t: %v", src.StreamID())
-		}
+
 		*activityFlag = false
+		if err == nil {
+			<-time.After(1 * time.Millisecond)
+			continue
+		}
+		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+			<-time.After(1 * time.Millisecond)
+			continue
+		}
+		logger.Info("[%v] finish t -> q: %v", src.StreamID(), dst.RemoteAddr().String())
 		return
 	}
 }
@@ -294,43 +296,35 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		_ = dst.SetWriteDeadline(tm)
 
 		if speedLimit == 0 {
-			written, err = io.CopyBuffer(dst, src, tempBuffer)
-			if src.RemoteAddr().String() == "127.0.0.1:8080" {
-				logger.Info("q -> t: %d", written)
-			}
-
+			written, err = io.Copy(dst, src)
 		} else {
 			var start = time.Now()
 			var limit = start.Add(loopTimeout)
 			written, err = io.CopyBuffer(dst, src, tempBuffer)
 			var end = limit.Sub(time.Now())
 
-			if src.RemoteAddr().String() == "127.0.0.1:8080" {
-				logger.Info("[%v] q -> t: %d / %v", dst.StreamID(), written, end.Nanoseconds())
-			}
 			time.Sleep(end)
 		}
 
-		//logger.Info("[%v] written: %d", dst.StreamID(), written)
+		if src.RemoteAddr().String() == "127.0.0.1:8080" {
+			logger.Info("[%v] q -> t: %d", dst.StreamID(), written)
+			logger.Info("[%v] error: %v", dst.StreamID(), err)
+		}
 		if written > 0 {
-			if src.RemoteAddr().String() == "127.0.0.1:8080" {
-				logger.Info("[%v] q -> t: %d", dst.StreamID(), written)
-			}
 			*activityFlag = true
 			api.Statistics.IncrementCounter(float64(written), api.PERF_DW_COUNT, trackedAddress)
 			continue
 		}
-		if err != nil {
-			if src.RemoteAddr().String() == "127.0.0.1:8080" {
-				logger.Info("[%v] error: %v", dst.StreamID(), err)
-			}
-			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				*activityFlag = false
-				<-time.After(1 * time.Millisecond)
-				continue
-			}
-		}
+
 		*activityFlag = false
+		if err == nil {
+			<-time.After(1 * time.Millisecond)
+			continue
+		}
+		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+			<-time.After(1 * time.Millisecond)
+			continue
+		}
 		logger.Info("[%v] finish q -> t: %v", dst.StreamID(), src.RemoteAddr().String())
 		return
 	}
