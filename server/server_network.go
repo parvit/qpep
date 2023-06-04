@@ -7,7 +7,6 @@ import (
 	"github.com/parvit/qpep/api"
 	"github.com/parvit/qpep/logger"
 	"github.com/parvit/qpep/shared"
-	"io"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -65,17 +64,19 @@ func listenQuicConn(quicSession quic.Connection) {
 	}
 }
 
-func connectionActivityTimer(conn_id interface{}, flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
+func connectionActivityTimer(dst quic.Stream, src net.Conn, flag_rx, flag_tx *bool, cancelFunc context.CancelFunc) {
 	if flag_tx == nil || flag_rx == nil {
 		return
 	}
 	<-time.After(ServerConfiguration.IdleTimeout)
 	if !*flag_rx && !*flag_tx {
-		logger.Info("[%v] connection canceled for inactivity", conn_id)
+		logger.Info("[%v] connection canceled for inactivity", dst.StreamID())
 		cancelFunc()
+		dst.Close()
+		src.Close()
 		return
 	}
-	go connectionActivityTimer(conn_id, flag_rx, flag_tx, cancelFunc)
+	go connectionActivityTimer(dst, src, flag_rx, flag_tx, cancelFunc)
 }
 
 // handleQuicStream handles a quic stream connection and bridges to the standard tcp for the common internet
@@ -156,7 +157,7 @@ func handleQuicStream(quicStream quic.Stream) {
 
 	go handleQuicToTcp(ctx, &streamWait, srcLimit, tcpConn, quicStream, proxyAddress, trackedAddress)
 	go handleTcpToQuic(ctx, &streamWait, dstLimit, quicStream, tcpConn, trackedAddress)
-	go connectionActivityTimer(quicStream.StreamID(), &activityRX, &activityTX, cancel)
+	go connectionActivityTimer(quicStream, tcpConn, &activityRX, &activityTX, cancel)
 
 	//we exit (and close the TCP connection) once both streams are done copying or timeout
 	logger.Info("== Stream %d Wait ==", quicStream.StreamID())
@@ -203,24 +204,35 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		default:
 		}
 
-		var written int64 = 0
+		var written int = 0
 		var err error
 
 		tm := time.Now().Add(loopTimeout)
 		_ = src.SetReadDeadline(tm)
 		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
 
-		if speedLimit == 0 {
-			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
+		var start = time.Now()
+		var limit = start.Add(loopTimeout)
+		read, err_t := src.Read(tempBuffer)
+		var end = limit.Sub(time.Now())
 
-		} else {
-			var start = time.Now()
-			var limit = start.Add(loopTimeout)
-			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
-			var end = limit.Sub(time.Now())
+		if err_t != nil {
+			*activityFlag = false
+			if nErr, ok := err_t.(net.Error); ok && nErr.Timeout() {
+				<-time.After(1 * time.Millisecond)
+				continue
+			}
+			_ = dst.Close()
+			return
+		}
+		if read > 0 {
+			*activityFlag = true
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
 
+			written, err = dst.Write(tempBuffer[:read])
+		}
+		if speedLimit != 0 {
 			time.Sleep(end)
 		}
 
@@ -232,10 +244,6 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		*activityFlag = false
 		if err == nil {
-			<-time.After(1 * time.Millisecond)
-			continue
-		}
-		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 			<-time.After(1 * time.Millisecond)
 			continue
 		}
@@ -276,24 +284,35 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 		default:
 		}
 
-		var written int64 = 0
+		var written int = 0
 		var err error
 
 		tm := time.Now().Add(loopTimeout)
 		_ = src.SetReadDeadline(tm)
 		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
 
-		if speedLimit == 0 {
-			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
+		var start = time.Now()
+		var limit = start.Add(loopTimeout)
+		read, err_t := src.Read(tempBuffer)
+		var end = limit.Sub(time.Now())
 
-		} else {
-			var start = time.Now()
-			var limit = start.Add(loopTimeout)
-			written, err = io.CopyBuffer(struct{ io.Writer }{dst}, struct{ io.Reader }{src}, tempBuffer)
-			var end = limit.Sub(time.Now())
+		if err_t != nil {
+			*activityFlag = false
+			if nErr, ok := err_t.(net.Error); ok && nErr.Timeout() {
+				<-time.After(1 * time.Millisecond)
+				continue
+			}
+			_ = dst.Close()
+			return
+		}
+		if read > 0 {
+			*activityFlag = true
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
 
+			written, err = dst.Write(tempBuffer[:read])
+		}
+		if speedLimit != 0 {
 			time.Sleep(end)
 		}
 
@@ -305,10 +324,6 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, speedLimit
 
 		*activityFlag = false
 		if err == nil {
-			<-time.After(1 * time.Millisecond)
-			continue
-		}
-		if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
 			<-time.After(1 * time.Millisecond)
 			continue
 		}

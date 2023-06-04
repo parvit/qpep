@@ -457,25 +457,41 @@ func handleTcpToQuic(ctx context.Context, streamWait *sync.WaitGroup, dst quic.S
 		default:
 		}
 
+		var written int = 0
+		var err error
+
 		tm := time.Now().Add(loopTimeout)
 		_ = src.SetReadDeadline(tm)
 		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
 
-		written, err := io.CopyBuffer(dst, src, tempBuffer)
+		read, err_t := src.Read(tempBuffer)
+
+		if err_t != nil {
+			*activityFlag = false
+			if nErr, ok := err_t.(net.Error); ok && nErr.Timeout() {
+				<-time.After(1 * time.Millisecond)
+				continue
+			}
+			_ = dst.Close()
+			return
+		}
+		if read > 0 {
+			*activityFlag = true
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
+
+			written, err = dst.Write(tempBuffer[:read])
+		}
 
 		if written > 0 {
 			*activityFlag = true
 			continue
 		}
-		if err != nil {
-			//logger.Error("err t->q: %v", err)
-			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				*activityFlag = false
-				<-time.After(1 * time.Millisecond)
-				continue
-			}
+
+		*activityFlag = false
+		if err == nil {
+			<-time.After(1 * time.Millisecond)
+			continue
 		}
 		return
 	}
@@ -508,27 +524,41 @@ func handleQuicToTcp(ctx context.Context, streamWait *sync.WaitGroup, dst net.Co
 		default:
 		}
 
+		var written int = 0
+		var err error
+
 		tm := time.Now().Add(loopTimeout)
 		_ = src.SetReadDeadline(tm)
 		_ = src.SetWriteDeadline(tm)
-		_ = dst.SetReadDeadline(tm)
-		_ = dst.SetWriteDeadline(tm)
 
-		written, err := io.CopyBuffer(dst, src, tempBuffer)
-		logger.Debug("q -> t: %d", written)
+		read, err_t := src.Read(tempBuffer)
+
+		if err_t != nil {
+			*activityFlag = false
+			if nErr, ok := err_t.(net.Error); ok && nErr.Timeout() {
+				<-time.After(1 * time.Millisecond)
+				continue
+			}
+			_ = dst.Close()
+			return
+		}
+		if read > 0 {
+			*activityFlag = true
+			_ = dst.SetReadDeadline(tm)
+			_ = dst.SetWriteDeadline(tm)
+
+			written, err = dst.Write(tempBuffer[:read])
+		}
 
 		if written > 0 {
 			*activityFlag = true
 			continue
 		}
-		if err != nil {
-			//logger.Error("err q->t: %v", err)
-			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				*activityFlag = false
-				<-time.After(1 * time.Millisecond)
-				continue
-			}
-			//logger.Info("finish q -> t: %v", src.StreamID())
+
+		*activityFlag = false
+		if err == nil {
+			<-time.After(1 * time.Millisecond)
+			continue
 		}
 		return
 	}

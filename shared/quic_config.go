@@ -14,6 +14,7 @@ func GetQuicConfiguration() *quic.Config {
 		DisablePathMTUDiscovery: false,
 
 		HandshakeIdleTimeout: GetScaledTimeout(10, time.Second),
+		//KeepAlivePeriod:      1 * time.Second,
 
 		EnableDatagrams: true,
 	}
