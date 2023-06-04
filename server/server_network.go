@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	BUFFER_SIZE = 32 * 1024
+	BUFFER_SIZE = 512 * 1024
 
 	ACTIVITY_RX_FLAG = "activity_rx"
 	ACTIVITY_TX_FLAG = "activity_tx"
