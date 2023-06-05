@@ -216,15 +216,15 @@ jobs:
           echo [Starting wait for tests execution...]
           CONN_NUM=1
           RETRIES=${{ inputs.server_wait_timeout }}
-          while ! (( RETRIES == 0 ));
+          while ! (( RETRIES <= 0 ));
           do
             CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections || true)
             echo "Connections alive: $CONN_NUM"
             if (( CONN_NUM <= 0 )); then
-              let "RETRIES -= 1"
+              (( RETRIES -= 1 ))
               echo "Remaining $RETRIES retries"
             else
-              let "RETRIES = ${{ inputs.server_wait_timeout }}"
+              (( RETRIES = ${{ inputs.server_wait_timeout }} ))
               echo "Remaining $RETRIES retries"
             fi
             sleep 1
