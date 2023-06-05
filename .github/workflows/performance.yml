@@ -195,9 +195,13 @@ jobs:
           cd docker/server-env/
           docker compose up -d
 
-      - name: Set connection delay
+      - name: Reset connection delay
         run: |
           sudo tc qdisc del dev ${{ inputs.connection_delay_device }} root
+
+      - name: Set connection delay
+        if: inputs.connection_delay_device > 0
+        run: |
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
 
       - name: Wait Tests
@@ -208,6 +212,7 @@ jobs:
           RETRIES=${{ inputs.server_wait_timeout }}
           while [ ! "$RETRIES" == "0" ];
           do
+            curl -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo
             CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections)
             if [[ ! "$CONN_NUM" == "0" ]]; then
               let "RETRIES -= 1"
