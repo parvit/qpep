@@ -207,6 +207,9 @@ jobs:
       - name: Wait Tests
         timeout-minutes: 60 # max allowed timeouts
         run: |
+          # initial wait for server setup
+          sleep 60
+          
           echo [Starting wait for tests execution...]
           CONN_NUM=1
           RETRIES=${{ inputs.server_wait_timeout }}
