@@ -221,10 +221,10 @@ jobs:
             CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections || true)
             echo "Connections alive: $CONN_NUM"
             if (( CONN_NUM <= 0 )); then
-              (( RETRIES -= 1 ))
+              RETRIES=(( RETRIES - 1 ))
               echo "Remaining $RETRIES retries"
             else
-              (( RETRIES = ${{ inputs.server_wait_timeout }} ))
+              RETRIES=${{ inputs.server_wait_timeout }}
               echo "Remaining $RETRIES retries"
             fi
             sleep 1
