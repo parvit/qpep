@@ -52,10 +52,8 @@ jobs:
       LISTEN_ADDRESS: ${{ inputs.client_listen_address }}
     strategy:
       matrix:
-#        download_size: [ 10, 100 ]
-#        connections_number: [ 1, 4 ]
-        download_size: [ 10 ]
-        connections_number: [ 1 ]
+        download_size: [ 10, 100 ]
+        connections_number: [ 1, 4 ]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -209,7 +207,6 @@ jobs:
       - name: Wait Tests
         timeout-minutes: 60 # max allowed timeouts
         run: |
-          set -x
           # initial wait for server setup
           sleep 60
           
