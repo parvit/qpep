@@ -6,21 +6,6 @@ on:
 
   workflow_dispatch:
     inputs:
-      server_wait_timeout:
-        description: 'Server global timeout for tests'
-        type: integer
-        default: 60
-        required: true
-      connection_delay_ms:
-        description: 'connection delay in milliseconds set on the server'
-        type: integer
-        default: 0
-        required: true
-      connection_delay_device:
-        description: 'serverside network device to set delay on'
-        type: string
-        default: eth0
-        required: true
       server_public_address:
         description: 'public address for the server'
         type: string
@@ -35,6 +20,21 @@ on:
         description: 'address for the client to listen on'
         type: string
         default: 192.168.1.21
+        required: true
+      server_wait_timeout:
+        description: 'Server global timeout for tests'
+        type: integer
+        default: 30
+        required: false
+      connection_delay_ms:
+        description: 'connection delay in milliseconds set on the server'
+        type: integer
+        default: 0
+        required: true
+      connection_delay_device:
+        description: 'serverside network device to set delay on'
+        type: string
+        default: eth0
         required: true
       remove_qpep_image:
         description: 'remove qpep image at end of run'
@@ -215,13 +215,13 @@ jobs:
           RETRIES=${{ inputs.server_wait_timeout }}
           while ! (( RETRIES == 0 ));
           do
-            curl -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo
-            CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections)
+            CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections || true)
+            echo "Connections alive: $CONN_NUM"
             if (( CONN_NUM <= 0 )); then
               let "RETRIES -= 1"
               echo "Remaining $RETRIES retries"
             else
-              let "RETRIES = 60"
+              let "RETRIES = ${{ inputs.server_wait_timeout }}"
               echo "Remaining $RETRIES retries"
             fi
             sleep 1
