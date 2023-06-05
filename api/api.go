@@ -81,7 +81,7 @@ func apiEcho(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		Address:         dataAddr[0],
 		Port:            port,
 		ServerVersion:   version.Version(),
-		TotalConnctions: int(Statistics.GetCounter("", TOTAL_CONNECTIONS)),
+		TotalConnctions: int(Statistics.GetCounter(TOTAL_CONNECTIONS)),
 	})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
