@@ -217,7 +217,7 @@ jobs:
           do
             curl -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo
             CONN_NUM=$(curl -s -XGET -H 'Accept:application/json' http://127.0.0.1:444/api/v1/server/echo | jq .total_connections)
-            if [[ ! "$CONN_NUM" == "0" ]]; then
+            if [[ "$CONN_NUM" <= "0" ]]; then
               let "RETRIES -= 1"
               echo "Remaining $RETRIES retries"
             else
