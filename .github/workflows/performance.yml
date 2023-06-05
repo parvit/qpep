@@ -197,6 +197,7 @@ jobs:
 
       - name: Set connection delay
         run: |
+          sudo tc qdisc del dev ${{ inputs.connection_delay_device }} root
           sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay ${{ inputs.connection_delay_ms }}ms
 
       - name: Wait Tests
@@ -247,7 +248,7 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          sudo tc qdisc replace dev ${{ inputs.connection_delay_device }} root handle 1: netem delay 0ms || true
+          sudo tc qdisc del dev ${{ inputs.connection_delay_device }} root || true
           sudo rm -rf docker/server-data-env/output/* || true
 
       - name: Remove server image
